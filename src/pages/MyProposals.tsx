@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, DollarSign, MessageSquare } from 'lucide-react';
+import { FileText, DollarSign, MessageSquare, MessageCircle } from 'lucide-react';
 import { supabase, Proposal, Job } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
 interface ProposalWithJob extends Proposal {
   job: Job;
+  hasDiscussion: boolean;
 }
 
 export default function MyProposals() {
@@ -39,7 +40,17 @@ export default function MyProposals() {
               .eq('id', proposal.job_id)
               .single();
 
-            return { ...proposal, job: jobData };
+            // Check if the client has already messaged this freelancer about this job
+            const { data: msgs } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('job_id', proposal.job_id)
+              .or(`sender_id.eq.${currentUser!.id},receiver_id.eq.${currentUser!.id}`)
+              .limit(1);
+
+            const hasDiscussion = (msgs?.length ?? 0) > 0;
+
+            return { ...proposal, job: jobData, hasDiscussion };
           })
         );
 
@@ -96,7 +107,7 @@ export default function MyProposals() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h2 className="text-xl font-bold text-blue-950">{proposal.job.title}</h2>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         proposal.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -113,6 +124,13 @@ export default function MyProposals() {
                       }`}>
                         Job: {proposal.job.status}
                       </span>
+                      {/* Discussion badge — shown when client has opened a chat before hiring */}
+                      {proposal.hasDiscussion && proposal.status === 'pending' && (
+                        <span className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 animate-pulse">
+                          <MessageCircle className="w-3 h-3" />
+                          Client wants to discuss
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-600 mb-3 line-clamp-2">{proposal.cover_letter}</p>
                   </div>
@@ -129,6 +147,21 @@ export default function MyProposals() {
                   >
                     View Job
                   </button>
+
+                  {/* Discussion started by client — freelancer can jump in */}
+                  {proposal.hasDiscussion && proposal.status === 'pending' && (
+                    <button
+                      onClick={() =>
+                        navigate(`/chat/${proposal.job_id}?proposalId=${proposal.id}&freelancerId=${proposal.freelancer_id}`)
+                      }
+                      className="flex items-center gap-2 bg-amber-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Open Discussion
+                    </button>
+                  )}
+
+                  {/* Post-hire chat */}
                   {proposal.status === 'accepted' && proposal.job.status === 'in_progress' && (
                     <button
                       onClick={() => navigate(`/chat/${proposal.job_id}`)}
