@@ -44,6 +44,7 @@ export default function Wallet() {
         .from('transactions')
         .select('*')
         .eq('user_id', currentUser?.id)
+        .in('type', ['deposit', 'escrow_lock', 'withdrawal'])
         .order('created_at', { ascending: false });
 
       if (transactionsData) {
@@ -167,6 +168,10 @@ export default function Wallet() {
     );
   }
 
+  // Client-specific balance: only what was deposited as a client, minus spending
+  const clientDeposited = transactions.filter(t => t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
+  const clientSpent = transactions.filter(t => t.type === 'escrow_lock').reduce((s, t) => s + t.amount, 0);
+  // available_balance may include freelance earnings — use wallet value as it's what can actually be spent
   const totalBalance = (wallet?.available_balance || 0) + (wallet?.escrow_balance || 0);
 
   return (
@@ -202,7 +207,10 @@ export default function Wallet() {
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <WalletIcon className="w-6 h-6" />
               </div>
-              <h2 className="text-lg font-semibold">Total Balance</h2>
+              <div>
+                <h2 className="text-lg font-semibold">Total Balance</h2>
+                <p className="text-xs text-blue-200">Available + In Escrow</p>
+              </div>
             </div>
             <p className="text-3xl font-bold">₦{totalBalance.toLocaleString()}</p>
           </div>
@@ -212,12 +220,18 @@ export default function Wallet() {
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">Available</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Available to Hire</h2>
+                <p className="text-xs text-gray-500">Funded · Ready to spend</p>
+              </div>
             </div>
             <p className="text-3xl font-bold text-green-600">
               ₦{(wallet?.available_balance || 0).toLocaleString()}
             </p>
-            <p className="text-sm text-gray-500 mt-2">Ready to withdraw</p>
+            <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400 space-y-0.5">
+              <p>Deposited: <span className="font-semibold text-gray-600">₦{clientDeposited.toLocaleString()}</span></p>
+              <p>Spent on hires: <span className="font-semibold text-gray-600">₦{clientSpent.toLocaleString()}</span></p>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6 border-2 border-blue-100">
@@ -225,19 +239,24 @@ export default function Wallet() {
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <Lock className="w-6 h-6 text-blue-600" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">In Escrow</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">In Escrow</h2>
+                <p className="text-xs text-gray-500">Locked in active jobs</p>
+              </div>
             </div>
             <p className="text-3xl font-bold text-blue-600">
               ₦{(wallet?.escrow_balance || 0).toLocaleString()}
             </p>
-            <p className="text-sm text-gray-500 mt-2">Locked in active jobs</p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center gap-3 mb-6">
             <History className="w-6 h-6 text-blue-950" />
-            <h2 className="text-xl font-bold text-blue-950">Transaction History</h2>
+            <div>
+              <h2 className="text-xl font-bold text-blue-950">Transaction History</h2>
+              <p className="text-xs text-gray-400">Deposits, hires &amp; withdrawals · Freelance earnings tracked separately</p>
+            </div>
           </div>
 
           {transactions.length === 0 ? (

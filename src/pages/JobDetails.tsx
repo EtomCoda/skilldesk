@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DollarSign, User, MessageSquare, CheckCircle, Clock, MessageCircle } from 'lucide-react';
+import {User, MessageSquare, CheckCircle, Clock, MessageCircle } from 'lucide-react';
 import { supabase, Job, User as UserType, Proposal, Hire } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -177,7 +177,6 @@ export default function JobDetails() {
                 </div>
 
                 <div className="flex items-center gap-2 text-2xl font-bold text-green-600 mb-6">
-                  <DollarSign className="w-6 h-6" />
                   <span>
                     {job.min_budget && job.max_budget 
                       ? job.min_budget === job.max_budget 
@@ -227,7 +226,7 @@ export default function JobDetails() {
 
               {hire && (
                 <button
-                  onClick={() => navigate(`/chat/${job.id}`)}
+                  onClick={() => navigate(`/messages?autoJobId=${job.id}`)}
                   className="mt-6 w-full bg-blue-950 text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -319,7 +318,7 @@ export default function JobDetails() {
                         <button
                           onClick={() =>
                             navigate(
-                              `/chat/${job.id}?proposalId=${proposal.id}&freelancerId=${proposal.freelancer_id}&amount=${proposal.proposed_amount}`
+                              `/messages?autoJobId=${job.id}&proposalId=${proposal.id}&freelancerId=${proposal.freelancer_id}&amount=${proposal.proposed_amount}`
                             )
                           }
                           className="w-full flex items-center justify-center gap-2 bg-blue-950 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-900 transition-colors"
@@ -331,7 +330,7 @@ export default function JobDetails() {
 
                       {proposal.status === 'accepted' && (
                         <button
-                          onClick={() => navigate(`/chat/${job.id}`)}
+                          onClick={() => navigate(`/messages?autoJobId=${job.id}`)}
                           className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                         >
                           <MessageCircle className="w-4 h-4" />

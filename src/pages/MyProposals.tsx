@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, DollarSign, MessageSquare, MessageCircle } from 'lucide-react';
+import { FileText, MessageSquare, MessageCircle } from 'lucide-react';
 import { supabase, Proposal, Job } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -135,7 +135,7 @@ export default function MyProposals() {
                     <p className="text-gray-600 mb-3 line-clamp-2">{proposal.cover_letter}</p>
                   </div>
                   <div className="ml-4 flex items-center gap-2 text-green-600 font-bold text-lg">
-                    <DollarSign className="w-5 h-5" />
+                  
                     <span>₦{proposal.proposed_amount.toLocaleString()}</span>
                   </div>
                 </div>
@@ -152,7 +152,7 @@ export default function MyProposals() {
                   {proposal.hasDiscussion && proposal.status === 'pending' && (
                     <button
                       onClick={() =>
-                        navigate(`/chat/${proposal.job_id}?proposalId=${proposal.id}&freelancerId=${proposal.freelancer_id}`)
+                        navigate(`/messages?autoJobId=${proposal.job_id}&proposalId=${proposal.id}&freelancerId=${proposal.freelancer_id}`)
                       }
                       className="flex items-center gap-2 bg-amber-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
                     >
@@ -164,7 +164,7 @@ export default function MyProposals() {
                   {/* Post-hire chat */}
                   {proposal.status === 'accepted' && proposal.job.status === 'in_progress' && (
                     <button
-                      onClick={() => navigate(`/chat/${proposal.job_id}`)}
+                      onClick={() => navigate(`/messages?autoJobId=${proposal.job_id}`)}
                       className="flex items-center gap-2 bg-blue-100 text-blue-950 px-6 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
                     >
                       <MessageSquare className="w-4 h-4" />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, DollarSign, Clock } from 'lucide-react';
+import { Search,Clock } from 'lucide-react';
 import { supabase, Job, User } from '../lib/supabase';
 interface JobWithClient extends Job {
   client: User;
@@ -114,7 +114,6 @@ export default function FindWork() {
                   </div>
                   <div className="ml-4 text-right">
                     <div className="flex items-center gap-2 text-green-600 font-bold text-lg whitespace-nowrap">
-                      <DollarSign className="w-5 h-5" />
                       <span>
                         {job.min_budget && job.max_budget 
                           ? job.min_budget === job.max_budget 

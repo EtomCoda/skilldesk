@@ -19,6 +19,8 @@ import AddPortfolioItem from './pages/AddPortfolioItem';
 import ChatRequests from './pages/ChatRequests';
 import DirectChat from './pages/DirectChat';
 import MyMessages from './pages/MyMessages';
+import Messages from './pages/Messages';
+import ClientProfile from './pages/ClientProfile';
 import Navbar from './components/Navbar';
 
 function App() {
@@ -152,9 +154,13 @@ function App() {
           <Route path="/browse-freelancers" element={<BrowseFreelancersAdvanced />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
           <Route path="/portfolio/new" element={<AddPortfolioItem />} />
+          {/* Legacy routes — kept for deep links */}
           <Route path="/chat-requests" element={<ChatRequests />} />
           <Route path="/direct-chat/:conversationId" element={<DirectChat />} />
           <Route path="/my-messages" element={<MyMessages />} />
+          {/* New unified routes */}
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/client/:clientId" element={<ClientProfile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

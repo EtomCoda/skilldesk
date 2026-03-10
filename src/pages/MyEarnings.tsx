@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, DollarSign, Briefcase, CheckCircle } from 'lucide-react';
+import { TrendingUp,Briefcase, CheckCircle, Clock, ArrowDownToLine } from 'lucide-react';
 import { supabase, Hire, Job } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -8,11 +8,20 @@ interface HireWithJob extends Hire {
   job: Job;
 }
 
+interface EarningsTransaction {
+  id: string;
+  amount: number;
+  description: string;
+  created_at: string;
+  job_id?: string;
+}
+
 export default function MyEarnings() {
   const navigate = useNavigate();
   const currentUser = useStore((state) => state.currentUser);
   const [hires, setHires] = useState<HireWithJob[]>([]);
   const [totalEarnings, setTotalEarnings] = useState(0);
+  const [earningsTransactions, setEarningsTransactions] = useState<EarningsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,18 +48,23 @@ export default function MyEarnings() {
               .select('*')
               .eq('id', hire.job_id)
               .single();
-
             return { ...hire, job: jobData };
           })
         );
-
         setHires(hiresWithJobs);
-
-        const total = hiresData
-          .filter((h) => h.status === 'completed')
-          .reduce((sum, h) => sum + h.escrow_amount, 0);
+        const total = hiresData.filter((h) => h.status === 'completed').reduce((sum, h) => sum + h.escrow_amount, 0);
         setTotalEarnings(total);
       }
+
+      // Fetch ONLY escrow_release transactions — freelancer payments only
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('id, amount, description, created_at, job_id')
+        .eq('user_id', currentUser?.id)
+        .eq('type', 'escrow_release')
+        .order('created_at', { ascending: false });
+
+      setEarningsTransactions(txData || []);
     } catch (err) {
       console.error('Error fetching earnings:', err);
     } finally {
@@ -70,21 +84,38 @@ export default function MyEarnings() {
 
   const activeJobs = hires.filter((h) => h.status === 'funded');
   const completedJobs = hires.filter((h) => h.status === 'completed');
+  const pendingPayment = activeJobs.reduce((sum, h) => sum + h.escrow_amount, 0);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold text-blue-950 mb-8">My Earnings</h1>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-green-600 to-green-500 rounded-xl shadow-lg p-6 text-white">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <TrendingUp className="w-6 h-6" />
               </div>
-              <h2 className="text-lg font-semibold">Total Earned</h2>
+              <div>
+                <h2 className="text-lg font-semibold">Total Earned</h2>
+                <p className="text-xs text-green-100">Completed jobs only</p>
+              </div>
             </div>
             <p className="text-3xl font-bold">₦{totalEarnings.toLocaleString()}</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 border-2 border-yellow-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Pending Payment</h2>
+                <p className="text-xs text-gray-500">On active jobs</p>
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-yellow-600">₦{pendingPayment.toLocaleString()}</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6 border-2 border-blue-100">
@@ -149,12 +180,12 @@ export default function MyEarnings() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-green-600 font-bold text-lg">
-                      <DollarSign className="w-5 h-5" />
+                    
                       <span>₦{hire.escrow_amount.toLocaleString()}</span>
                     </div>
                     {hire.status === 'funded' && (
                       <button
-                        onClick={() => navigate(`/chat/${hire.job_id}`)}
+                        onClick={() => navigate(`/messages?autoJobId=${hire.job_id}`)}
                         className="bg-blue-950 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-900 transition-colors"
                       >
                         Continue Work
@@ -166,6 +197,34 @@ export default function MyEarnings() {
             </div>
           </div>
         )}
+
+        {/* Payment history — escrow_release transactions only */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
+          <div className="flex items-center gap-3 mb-6">
+            <ArrowDownToLine className="w-6 h-6 text-green-600" />
+            <div>
+              <h2 className="text-xl font-bold text-blue-950">Payment History</h2>
+              <p className="text-xs text-gray-400">Payments received from completed jobs · Client wallet activity not included</p>
+            </div>
+          </div>
+          {earningsTransactions.length === 0 ? (
+            <p className="text-center text-gray-400 py-8 text-sm">No payments received yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {earningsTransactions.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">{tx.description}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(tx.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                  <span className="text-green-600 font-bold">+₦{tx.amount.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ export default function Chat() {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { currentUser, setWallet } = useStore();
+  const { currentUser, setWallet, viewMode } = useStore();
 
   // Proposal ID passed in URL when entering discussion mode from JobDetails
   const proposalId = searchParams.get('proposalId');
@@ -67,12 +67,30 @@ export default function Chat() {
 
       setHire(hireData);
 
+      // ── Role-mode guard ──
+      // A dual-role user switching to Client mode must NOT see a job
+      // where they are the freelancer (and vice versa).
+      const userIsActualClient = jobData.client_id === currentUser?.id;
+      const userIsActualFreelancer =
+        hireData?.freelancer_id === currentUser?.id ||
+        proposalFreelancerId === currentUser?.id;
+
+      if (viewMode === 'buying' && !userIsActualClient && userIsActualFreelancer) {
+        // They are in Client mode but this is their freelancer job — redirect
+        navigate(-1);
+        return;
+      }
+      if (viewMode === 'selling' && !userIsActualFreelancer && userIsActualClient) {
+        // They are in Freelancer mode but this is their own posted job — let them through
+        // (Job owners can always see their own job chat from the client side)
+      }
+
       // Load the proposal live (amount may change during discussion)
       if (proposalId) await fetchProposal();
 
       // Determine the other user
       let otherUserId: string | null = null;
-      if (currentUser!.id === jobData.client_id) {
+      if (userIsActualClient) {
         otherUserId = hireData?.freelancer_id || proposalFreelancerId || null;
       } else {
         otherUserId = jobData.client_id;
