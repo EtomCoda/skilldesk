@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   MessageCircle, Send, ArrowLeft, Check, X, Briefcase, Inbox, ShieldCheck,
-  AlertCircle, Edit3, CheckCircle, Clock,
+  AlertCircle, Edit3, CheckCircle, Clock, Star,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
@@ -70,6 +70,7 @@ function fmtTime(d: string) {
 export default function Messages() {
   const { currentUser, viewMode, setWallet } = useStore();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const autoJobId = searchParams.get('autoJobId');
   const autoProposalId = searchParams.get('proposalId');
   const autoFreelancerId = searchParams.get('freelancerId');
@@ -433,6 +434,7 @@ export default function Messages() {
     }
     if (selected) await fetchJobCtx(selected);
     alert('Job completed! Payment released to freelancer.');
+    navigate(`/review/${job.id}`);
   }
 
   // ── Accept / decline request ──────────────────────────────────────────────
@@ -678,9 +680,19 @@ export default function Messages() {
               <div className="bg-blue-50 border-b border-blue-100 px-4 py-2.5 flex-shrink-0">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-blue-900 font-medium">Escrow: <span className="font-bold">₦{jCtx.hire.escrow_amount.toLocaleString()}</span></span>
-                  <span className={`px-2 py-0.5 rounded-full font-semibold ${jCtx.hire.status === 'funded' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                    {jCtx.hire.status === 'funded' ? 'Escrow Funded' : 'Completed'}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-0.5 rounded-full font-semibold ${jCtx.hire.status === 'funded' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                      {jCtx.hire.status === 'funded' ? 'Escrow Funded' : 'Completed'}
+                    </span>
+                    {jCtx.hire.status === 'completed' && jCtx?.job?.id && (
+                      <button 
+                        onClick={() => navigate(`/review/${jCtx.job.id}`)}
+                        className="flex items-center gap-1.5 text-blue-700 hover:text-blue-900 font-semibold transition-colors"
+                      >
+                        <Star className="w-3.5 h-3.5" /> Leave Review
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
