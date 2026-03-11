@@ -319,16 +319,38 @@ export default function Messages() {
     const { data: job } = await supabase.from('jobs').select('*').eq('id', conv.jobId).single();
     const { data: hire } = await supabase.from('hires').select('*').eq('job_id', conv.jobId).maybeSingle();
     let proposal = null;
+
+    // 1. Try by explicit proposalId first (most specific)
     if (conv.proposalId) {
-      const { data: p } = await supabase.from('proposals').select('*').eq('id', conv.proposalId).single();
-      proposal = p;
-    } else if (job?.status === 'open') {
-      const { data: p } = await supabase.from('proposals').select('*').eq('job_id', conv.jobId).eq('status', 'pending').maybeSingle();
-      proposal = p;
+      const { data: p } = await supabase.from('proposals').select('*').eq('id', conv.proposalId).maybeSingle();
+      if (p) proposal = p;
     }
+
+    // 2. Fallback: any pending proposal for this open job
+    if (!proposal && job?.status === 'open') {
+      const { data: p } = await supabase
+        .from('proposals').select('*')
+        .eq('job_id', conv.jobId)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (p) proposal = p;
+    }
+
+    // 3. Last resort: find proposal by the other party (e.g. the freelancer we're talking to)
+    if (!proposal && job?.status === 'open' && conv.otherUser?.id) {
+      const { data: p } = await supabase
+        .from('proposals').select('*')
+        .eq('job_id', conv.jobId)
+        .eq('freelancer_id', conv.otherUser.id)
+        .neq('status', 'rejected')
+        .maybeSingle();
+      if (p) proposal = p;
+    }
+
     setJCtx({ job, hire, proposal });
     if (proposal && !editingOffer) setNewOfferAmt(String(proposal.proposed_amount));
   }
+
 
   // ── Send message ─────────────────────────────────────────────────────────
 
@@ -448,8 +470,11 @@ export default function Messages() {
   // ── Derived values ────────────────────────────────────────────────────────
 
   const pendingCount = pendingReqs.length;
-  const isDiscussion = selected?.type === 'job' && jCtx?.job?.status === 'open' && !!jCtx?.proposal && !jCtx?.hire;
   const iAmClient = jCtx?.job ? jCtx.job.client_id === currentUser?.id : false;
+  // Client sees their banner whenever job is open + no hire — regardless of proposal load state
+  const isClientDiscussion = selected?.type === 'job' && !!jCtx?.job && jCtx?.job?.status === 'open' && !jCtx?.hire && iAmClient;
+  // Freelancer sees their offer banner only once proposal is loaded
+  const isFreelancerDiscussion = selected?.type === 'job' && !!jCtx?.job && jCtx?.job?.status === 'open' && !jCtx?.hire && !iAmClient && !!jCtx?.proposal;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -591,25 +616,36 @@ export default function Messages() {
             </div>
 
             {/* ── Context banners ── */}
-            {isDiscussion && iAmClient && jCtx.proposal && (
+            {/* CLIENT: shows as soon as job is open + no hire (proposal loading handled inside) */}
+            {isClientDiscussion && (
               <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex-shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span className="text-sm text-amber-800">
-                      <span className="font-semibold">Discussion in progress</span> · Offer:{' '}
-                      <span className="font-bold">₦{jCtx.proposal.proposed_amount.toLocaleString()}</span>
-                      <span className="text-xs ml-1 text-amber-500">(live)</span>
-                    </span>
+                    {jCtx?.proposal ? (
+                      <span className="text-sm text-amber-800">
+                        <span className="font-semibold">Discussion in progress</span> · Offer:{' '}
+                        <span className="font-bold">₦{jCtx.proposal.proposed_amount.toLocaleString()}</span>
+                        <span className="text-xs ml-1 text-amber-500">(live)</span>
+                      </span>
+                    ) : (
+                      <span className="text-sm text-amber-700">Loading offer details...</span>
+                    )}
                   </div>
-                  <button onClick={handleConfirmHire} disabled={hiringInProgress} className="flex items-center gap-1.5 bg-blue-950 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-900 whitespace-nowrap disabled:opacity-50">
-                    <ShieldCheck className="w-3.5 h-3.5" /> {hiringInProgress ? 'Processing...' : 'Confirm Hire'}
+                  <button
+                    onClick={handleConfirmHire}
+                    disabled={hiringInProgress || !jCtx?.proposal}
+                    className="flex items-center gap-1.5 bg-blue-950 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-900 whitespace-nowrap disabled:opacity-50"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    {hiringInProgress ? 'Processing...' : 'Confirm Hire & Fund Escrow'}
                   </button>
                 </div>
               </div>
             )}
 
-            {isDiscussion && !iAmClient && jCtx?.proposal && (
+            {/* FREELANCER: shows once proposal is loaded */}
+            {isFreelancerDiscussion && jCtx?.proposal && (
               <div className="bg-blue-50 border-b border-blue-100 px-4 py-3 flex-shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
