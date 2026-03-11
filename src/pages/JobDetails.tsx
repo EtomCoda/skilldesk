@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {User, MessageSquare, CheckCircle, Clock, MessageCircle } from 'lucide-react';
 import { supabase, Job, User as UserType, Proposal, Hire } from '../lib/supabase';
 import { useStore } from '../store/useStore';
@@ -172,7 +172,13 @@ export default function JobDetails() {
                   </div>
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    <span>{client?.full_name}</span>
+                    <Link 
+                      to={`/client/${job.client_id}`}
+                      className="hover:text-blue-600 hover:underline transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-sm"
+                      title="View Client Profile"
+                    >
+                      {client?.full_name}
+                    </Link>
                   </div>
                 </div>
 
