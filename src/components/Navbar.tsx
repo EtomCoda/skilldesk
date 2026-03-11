@@ -250,17 +250,31 @@ export default function Navbar({ onLogout }: NavbarProps) {
             >
               {viewMode === 'buying' ? 'Switch to Freelancer Mode' : 'Switch to Client Mode'}
             </button>
-            <Link
-              to="/wallet"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Wallet{wallet && (
-                <span className="ml-2 text-green-600 font-bold text-sm">
-                  ₦{wallet.available_balance.toLocaleString()}
-                </span>
-              )}
-            </Link>
+            {viewMode === 'buying' ? (
+              <Link
+                to="/wallet"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Wallet{wallet && (
+                  <span className="ml-2 text-green-600 font-bold text-sm">
+                    ₦{wallet.available_balance.toLocaleString()}
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <Link
+                to="/my-earnings"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Earnings{freelancerEarnings !== null && (
+                  <span className="ml-2 text-green-600 font-bold text-sm">
+                    ₦{freelancerEarnings.toLocaleString()}
+                  </span>
+                )}
+              </Link>
+            )}
             <button
               onClick={() => { onLogout(); setMobileMenuOpen(false); }}
               className="w-full text-left px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50"

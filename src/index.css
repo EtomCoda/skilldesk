@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Mobile-safe global resets ───────────────────────────────────────────── */
+html {
+  overflow-x: hidden;
+  /* dvh = dynamic viewport height (shrinks when mobile browser chrome hides) */
+  height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  height: 100%;
+  -webkit-tap-highlight-color: transparent; /* remove blue flash on mobile tap */
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}

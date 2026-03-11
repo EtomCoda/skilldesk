@@ -177,31 +177,31 @@ export default function Wallet() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold text-blue-950">My Wallet</h1>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3 w-full sm:w-auto">
             {viewMode === 'buying' && (
               <button
                 onClick={handleFundAccount}
                 disabled={funding}
-                className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex flex-1 sm:flex-none justify-center items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-green-700 transition-all shadow-sm disabled:opacity-50 text-sm"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 {funding ? 'Processing...' : 'Fund Account'}
               </button>
             )}
             <button
               onClick={handleWithdraw}
               disabled={withdrawing || (wallet?.available_balance || 0) <= 0}
-              className="flex items-center gap-2 bg-blue-950 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-900 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex flex-1 sm:flex-none justify-center items-center gap-2 bg-blue-950 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-blue-900 transition-all shadow-sm disabled:opacity-50 text-sm"
             >
-              <ArrowDownToLine className="w-5 h-5" />
+              <ArrowDownToLine className="w-4 h-4" />
               {withdrawing ? 'Processing...' : 'Withdraw Funds'}
             </button>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-8">
           <div className="bg-gradient-to-br from-blue-950 to-blue-800 rounded-xl shadow-lg p-6 text-white">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">

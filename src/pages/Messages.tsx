@@ -479,7 +479,7 @@ export default function Messages() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex overflow-hidden bg-gray-100" style={{ height: 'calc(100vh - 116px)' }}>
+    <div className="flex overflow-hidden bg-gray-100 h-full min-h-0">
 
       {/* ════════════ LEFT PANEL — conversation list ════════════ */}
       <div className={`${selected ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex-shrink-0 relative`}>

@@ -138,31 +138,34 @@ function App() {
   console.log("User active, rendering main app routers.");
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50">
+      {/* Full viewport height flex column — navbar fixed at top, content scrolls below */}
+      <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
         <Navbar onLogout={handleLogout} />
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/post-job" element={<PostJob />} />
-          <Route path="/find-work" element={<FindWork />} />
-          <Route path="/job/:jobId" element={<JobDetails />} />
-          <Route path="/chat/:jobId" element={<Chat />} />
-          <Route path="/review/:jobId" element={<ReviewJob />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/my-hires" element={<MyHires />} />
-          <Route path="/my-proposals" element={<MyProposals />} />
-          <Route path="/my-earnings" element={<MyEarnings />} />
-          <Route path="/browse-freelancers" element={<BrowseFreelancersAdvanced />} />
-          <Route path="/seller/:sellerId" element={<SellerProfile />} />
-          <Route path="/portfolio/new" element={<AddPortfolioItem />} />
-          {/* Legacy routes — kept for deep links */}
-          <Route path="/chat-requests" element={<ChatRequests />} />
-          <Route path="/direct-chat/:conversationId" element={<DirectChat />} />
-          <Route path="/my-messages" element={<MyMessages />} />
-          {/* New unified routes */}
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/client/:clientId" element={<ClientProfile />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <main className="flex-1 overflow-auto min-h-0">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/post-job" element={<PostJob />} />
+            <Route path="/find-work" element={<FindWork />} />
+            <Route path="/job/:jobId" element={<JobDetails />} />
+            <Route path="/chat/:jobId" element={<Chat />} />
+            <Route path="/review/:jobId" element={<ReviewJob />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/my-hires" element={<MyHires />} />
+            <Route path="/my-proposals" element={<MyProposals />} />
+            <Route path="/my-earnings" element={<MyEarnings />} />
+            <Route path="/browse-freelancers" element={<BrowseFreelancersAdvanced />} />
+            <Route path="/seller/:sellerId" element={<SellerProfile />} />
+            <Route path="/portfolio/new" element={<AddPortfolioItem />} />
+            {/* Legacy routes — kept for deep links */}
+            <Route path="/chat-requests" element={<ChatRequests />} />
+            <Route path="/direct-chat/:conversationId" element={<DirectChat />} />
+            <Route path="/my-messages" element={<MyMessages />} />
+            {/* New unified routes */}
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/client/:clientId" element={<ClientProfile />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
       </div>
     </BrowserRouter>
   );
