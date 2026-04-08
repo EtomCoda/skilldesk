@@ -174,10 +174,17 @@ export default function Messages() {
     })();
   }, [autoJobId, currentUser, listLoading, convItems]);
 
-  // ── Scroll to bottom on new messages ───────────────────────────────────
+  const lastMessageIdRef = useRef<string | null>(null);
 
+  // ── Scroll to bottom only on new messages ────────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatMsgs.length > 0) {
+      const lastMsg = chatMsgs[chatMsgs.length - 1];
+      if (lastMsg.id !== lastMessageIdRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        lastMessageIdRef.current = lastMsg.id;
+      }
+    }
   }, [chatMsgs]);
 
   // ── Job conversations ────────────────────────────────────────────────────
@@ -280,6 +287,7 @@ export default function Messages() {
   async function selectConv(conv: ConvItem) {
     setSelected(conv);
     setChatMsgs([]);
+    lastMessageIdRef.current = null;
     setChatLoading(true);
     setJCtx(null);
     setEditingOffer(false);

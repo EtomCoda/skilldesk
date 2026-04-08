@@ -164,8 +164,24 @@ export default function Navbar({ onLogout }: NavbarProps) {
             </button>
           </div>
 
-          {/* Mobile hamburger */}
-          <button
+          </div>
+
+          {/* Mobile Action Icons */}
+          <div className="md:hidden flex items-center gap-1">
+            <Link
+              to="/messages"
+              className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+            >
+              <MessageCircle className="w-6 h-6" />
+              {pendingRequestsCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center border border-white">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Mobile hamburger */}
+            <button
             className="md:hidden p-2 flex items-center gap-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             style={{ color: 'rgb(37, 99, 235)' }}
@@ -180,8 +196,35 @@ export default function Navbar({ onLogout }: NavbarProps) {
           </button>
         </div>
 
-        {/* Sub-nav — strictly mode-separated */}
-        <div className="border-t" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
+        {/* Mobile Quick Actions (Mode & Wallet/Earnings) */}
+        <div className="md:hidden border-t py-2 flex justify-between items-center" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
+          <button
+            onClick={() => handleModeToggle()}
+            className="text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm border border-blue-100"
+            style={{ color: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.05)' }}
+          >
+            {viewMode === 'buying' ? 'Client Mode' : 'Freelancer Mode'}
+          </button>
+          
+          {viewMode === 'buying' ? (
+            <Link
+              to="/wallet"
+              className="text-xs font-medium text-gray-700 flex items-center bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100"
+            >
+              Wallet {wallet && <span className="ml-1 text-green-600 font-bold">₦{wallet.available_balance.toLocaleString()}</span>}
+            </Link>
+          ) : (
+            <Link
+              to="/my-earnings"
+              className="text-xs font-medium text-gray-700 flex items-center bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100"
+            >
+              Earnings {freelancerEarnings !== null && <span className="ml-1 text-green-600 font-bold">₦{freelancerEarnings.toLocaleString()}</span>}
+            </Link>
+          )}
+        </div>
+
+        {/* Sub-nav — strictly mode-separated (Desktop only) */}
+        <div className="border-t hidden md:block" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
           <div className="flex gap-1 py-2 overflow-x-auto">
             {viewMode === 'buying' ? (
               /* ── CLIENT mode ── */
@@ -243,41 +286,25 @@ export default function Navbar({ onLogout }: NavbarProps) {
               </div>
             </button>
 
-            <button
-              onClick={() => { handleModeToggle(); setMobileMenuOpen(false); }}
-              className="w-full text-left px-4 py-2 rounded-lg font-medium"
-              style={{ color: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.05)' }}
-            >
-              {viewMode === 'buying' ? 'Switch to Freelancer Mode' : 'Switch to Client Mode'}
-            </button>
-            {viewMode === 'buying' ? (
-              <Link
-                to="/wallet"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Wallet{wallet && (
-                  <span className="ml-2 text-green-600 font-bold text-sm">
-                    ₦{wallet.available_balance.toLocaleString()}
-                  </span>
-                )}
-              </Link>
-            ) : (
-              <Link
-                to="/my-earnings"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Earnings{freelancerEarnings !== null && (
-                  <span className="ml-2 text-green-600 font-bold text-sm">
-                    ₦{freelancerEarnings.toLocaleString()}
-                  </span>
-                )}
-              </Link>
-            )}
+            {/* Mode-specific Nav Links */}
+            <div className="py-2 space-y-1">
+              {viewMode === 'buying' ? (
+                <>
+                  <Link to="/post-job" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Post a Job</Link>
+                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">My Hires</Link>
+                  <Link to="/browse-freelancers" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Browse Freelancers</Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/find-work" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Find Work</Link>
+                  <Link to="/my-proposals" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">My Proposals</Link>
+                </>
+              )}
+            </div>
+
             <button
               onClick={() => { onLogout(); setMobileMenuOpen(false); }}
-              className="w-full text-left px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50"
+              className="w-full text-left px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50 mt-2"
             >
               Logout
             </button>
