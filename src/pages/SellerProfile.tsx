@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Star, MessageCircle, Plus, Edit3 } from 'lucide-react';
 import { supabase, User as UserType } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import SkillInput from '../components/SkillInput';
 
 interface Portfolio {
   id: string;
@@ -43,7 +44,7 @@ export default function SellerProfile() {
   const [sending, setSending] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editBio, setEditBio] = useState('');
-  const [editSkills, setEditSkills] = useState('');
+  const [editSkills, setEditSkills] = useState<string[]>([]);
   const setCurrentUser = useStore((state) => state.setCurrentUser);
   const [saving, setSaving] = useState(false);
 
@@ -127,7 +128,12 @@ export default function SellerProfile() {
 
   const openEditModal = () => {
     setEditBio(seller?.bio || '');
-    setEditSkills(seller?.skills || '');
+    // Parse existing comma-separated skills string into an array
+    setEditSkills(
+      seller?.skills
+        ? seller.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : []
+    );
     setShowEditModal(true);
   };
 
@@ -137,7 +143,7 @@ export default function SellerProfile() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .update({ bio: editBio, skills: editSkills })
+        .update({ bio: editBio, skills: editSkills.join(', ') })
         .eq('id', currentUser.id)
         .select()
         .single();
@@ -447,18 +453,11 @@ export default function SellerProfile() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Skills <span className="text-gray-400 font-normal">(comma separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={editSkills}
-                  onChange={(e) => setEditSkills(e.target.value)}
-                  placeholder="e.g. Graphic Design, Video Editing, Writing"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
-              </div>
+              <SkillInput
+                skills={editSkills}
+                onChange={setEditSkills}
+                label="Your Skills"
+              />
 
               <div className="flex gap-4 pt-4">
                 <button

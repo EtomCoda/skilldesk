@@ -71,13 +71,38 @@ export default function Navbar({ onLogout }: NavbarProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Top bar */}
-        <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl" style={{ color: 'rgb(37, 99, 235)' }}>
+        <div className="flex items-center h-16 relative">
+
+          {/* LEFT: Logo only */}
+          <Link to="/" className="flex items-center gap-2 font-bold text-xl flex-shrink-0" style={{ color: 'rgb(37, 99, 235)' }}>
             <GraduationCap className="w-8 h-8" />
-            <span>SkillDesk</span>
+            <span className="hidden sm:inline">SkillDesk</span>
           </Link>
 
-          {/* Desktop right */}
+          {/* CENTER: Mode badge + wallet — absolutely centered on mobile */}
+          <div className="md:hidden absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <button
+              onClick={handleModeToggle}
+              className="text-xs px-2.5 py-1.5 rounded-lg font-semibold border border-blue-200 leading-none whitespace-nowrap"
+              style={{ color: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.07)' }}
+            >
+              {viewMode === 'buying' ? 'Client Mode' : 'Freelancer Mode'}
+            </button>
+            {viewMode === 'buying' ? (
+              <Link to="/wallet" className="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-lg leading-none whitespace-nowrap">
+                {wallet ? `₦${wallet.available_balance.toLocaleString()}` : 'Wallet'}
+              </Link>
+            ) : (
+              <Link to="/my-earnings" className="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-lg leading-none whitespace-nowrap">
+                {freelancerEarnings !== null ? `₦${freelancerEarnings.toLocaleString()}` : 'Earnings'}
+              </Link>
+            )}
+          </div>
+
+          {/* Push desktop right-group to far right; on mobile this is a spacer */}
+          <div className="flex-1" />
+
+          {/* RIGHT: Desktop controls */}
           <div className="hidden md:flex items-center gap-3">
             {/* Mode toggle */}
             <div
@@ -89,12 +114,12 @@ export default function Navbar({ onLogout }: NavbarProps) {
                 {viewMode === 'buying' ? (
                   <>
                     <ShoppingBag className="w-5 h-5" style={{ color: 'rgb(37, 99, 235)' }} />
-                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>Client Mode</span>
+                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>You are in Client Mode</span>
                   </>
                 ) : (
                   <>
                     <Briefcase className="w-5 h-5" style={{ color: 'rgb(37, 99, 235)' }} />
-                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>Freelancer Mode</span>
+                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>You are in Freelancer Mode</span>
                   </>
                 )}
               </button>
@@ -164,10 +189,8 @@ export default function Navbar({ onLogout }: NavbarProps) {
             </button>
           </div>
 
-          </div>
-
-          {/* Mobile Action Icons */}
-          <div className="md:hidden flex items-center gap-1">
+          {/* RIGHT: Mobile — chat icon + hamburger */}
+          <div className="md:hidden flex items-center flex-shrink-0">
             <Link
               to="/messages"
               className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
@@ -179,49 +202,23 @@ export default function Navbar({ onLogout }: NavbarProps) {
                 </span>
               )}
             </Link>
-
-            {/* Mobile hamburger */}
             <button
-            className="md:hidden p-2 flex items-center gap-2"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{ color: 'rgb(37, 99, 235)' }}
-          >
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-              style={{ backgroundColor: 'rgb(37, 99, 235)' }}
+              className="p-2 flex items-center gap-1.5"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{ color: 'rgb(37, 99, 235)' }}
             >
-              {initials}
-            </div>
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: 'rgb(37, 99, 235)' }}
+              >
+                {initials}
+              </div>
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
 
-        {/* Mobile Quick Actions (Mode & Wallet/Earnings) */}
-        <div className="md:hidden border-t py-2 flex justify-between items-center" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
-          <button
-            onClick={() => handleModeToggle()}
-            className="text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm border border-blue-100"
-            style={{ color: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.05)' }}
-          >
-            {viewMode === 'buying' ? 'Client Mode' : 'Freelancer Mode'}
-          </button>
-          
-          {viewMode === 'buying' ? (
-            <Link
-              to="/wallet"
-              className="text-xs font-medium text-gray-700 flex items-center bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100"
-            >
-              Wallet {wallet && <span className="ml-1 text-green-600 font-bold">₦{wallet.available_balance.toLocaleString()}</span>}
-            </Link>
-          ) : (
-            <Link
-              to="/my-earnings"
-              className="text-xs font-medium text-gray-700 flex items-center bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100"
-            >
-              Earnings {freelancerEarnings !== null && <span className="ml-1 text-green-600 font-bold">₦{freelancerEarnings.toLocaleString()}</span>}
-            </Link>
-          )}
-        </div>
+        </div>{/* end top bar */}
+
 
         {/* Sub-nav — strictly mode-separated (Desktop only) */}
         <div className="border-t hidden md:block" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
@@ -230,7 +227,7 @@ export default function Navbar({ onLogout }: NavbarProps) {
               /* ── CLIENT mode ── */
               <>
                 <Link to="/post-job" className={navLink(isActive('/post-job'))}>Post a Job</Link>
-                <Link to="/my-hires" className={navLink(isActive('/my-hires'))}>My Hires</Link>
+                <Link to="/my-hires" className={navLink(isActive('/my-hires'))}>Posted Jobs</Link>
                 <Link to="/browse-freelancers" className={navLink(isActive('/browse-freelancers'))}>Browse Freelancers</Link>
                 <Link
                   to="/messages"
@@ -291,7 +288,7 @@ export default function Navbar({ onLogout }: NavbarProps) {
               {viewMode === 'buying' ? (
                 <>
                   <Link to="/post-job" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Post a Job</Link>
-                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">My Hires</Link>
+                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Posted Jobs</Link>
                   <Link to="/browse-freelancers" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Browse Freelancers</Link>
                 </>
               ) : (

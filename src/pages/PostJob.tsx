@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Briefcase } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import SkillInput from '../components/SkillInput';
 
 export default function PostJob() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function PostJob() {
   const [description, setDescription] = useState('');
   const [minBudget, setMinBudget] = useState('');
   const [maxBudget, setMaxBudget] = useState('');
-  const [requiredSkills, setRequiredSkills] = useState('');
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,7 +46,7 @@ export default function PostJob() {
           budget: max, // Keep for backward compat
           min_budget: min,
           max_budget: max,
-          required_skills: requiredSkills.trim() ? requiredSkills : null,
+          required_skills: requiredSkills.length ? requiredSkills.join(', ') : null,
           status: 'open',
         });
 
@@ -122,19 +123,12 @@ export default function PostJob() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="requiredSkills" className="block text-sm font-medium text-gray-700 mb-2">
-                Required Skills <span className="text-gray-400 font-normal">(comma separated, optional)</span>
-              </label>
-              <input
-                id="requiredSkills"
-                type="text"
-                value={requiredSkills}
-                onChange={(e) => setRequiredSkills(e.target.value)}
-                placeholder="e.g., React, Python, Graphic Design"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
-              />
-            </div>
+            <SkillInput
+              skills={requiredSkills}
+              onChange={setRequiredSkills}
+              label="Required Skills"
+              optional
+            />
 
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
