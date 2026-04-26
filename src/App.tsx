@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
+import { useIdleTimeout } from './hooks/useIdleTimeout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PostJob from './pages/PostJob';
@@ -136,11 +137,21 @@ function App() {
   }
 
   console.log("User active, rendering main app routers.");
+  return <AuthenticatedApp onLogout={handleLogout} />;
+}
+
+// ── Authenticated shell (idle timeout lives here) ──────────────────────────
+function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
+  // Sign out automatically after 30 minutes of inactivity
+  useIdleTimeout(30 * 60 * 1000, () => {
+    alert('You have been logged out due to inactivity.');
+  });
+
   return (
     <BrowserRouter>
       {/* Full viewport height flex column — navbar fixed at top, content scrolls below */}
       <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
-        <Navbar onLogout={handleLogout} />
+        <Navbar onLogout={onLogout} />
         <main className="flex-1 overflow-auto min-h-0">
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -172,3 +183,4 @@ function App() {
 }
 
 export default App;
+
