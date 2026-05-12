@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { useToast } from '../lib/toast';
+import { notify } from '../lib/notifications';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ function fmtTime(d: string) {
 
 export default function Messages() {
   const { currentUser, viewMode, setWallet } = useStore();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const autoJobId = searchParams.get('autoJobId');
@@ -100,7 +104,8 @@ export default function Messages() {
   const [processingReqId, setProcessingReqId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  // Holds the active Supabase Realtime channel — replaced on each conversation switch
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // ── Load conversation list ───────────────────────────────────────────────
 
@@ -292,20 +297,53 @@ export default function Messages() {
     setJCtx(null);
     setEditingOffer(false);
 
-    if (pollRef.current) clearInterval(pollRef.current);
+    // Tear down previous Realtime subscription before opening a new one
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
 
+    // Initial load: fetch existing messages + job context once
     await fetchMsgs(conv);
     if (conv.type === 'job' && conv.jobId) await fetchJobCtx(conv);
-
     setChatLoading(false);
 
-    pollRef.current = setInterval(async () => {
-      await fetchMsgs(conv);
-      if (conv.type === 'job' && conv.jobId) await fetchJobCtx(conv);
-    }, 2000);
+    // ── Supabase Realtime subscription ────────────────────────────────────
+    // Uses a WebSocket connection — zero DB polling, instant delivery.
+    // Job context (hire/proposal) is NOT re-fetched here; it only changes
+    // when a deliberate action (hire, complete) is taken, not on every message.
+    const channelName = conv.type === 'job'
+      ? `chat:job:${conv.jobId}`
+      : `chat:direct:${conv.conversationId}`;
+
+    const table = conv.type === 'job' ? 'messages' : 'direct_messages';
+    const filter = conv.type === 'job'
+      ? `job_id=eq.${conv.jobId}`
+      : `conversation_id=eq.${conv.conversationId}`;
+
+    channelRef.current = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table, filter },
+        (payload) => {
+          // Append the new message directly — no extra DB round-trip needed
+          const newMsg = payload.new as ChatMsg;
+          setChatMsgs((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev; // dedupe
+            const next = [...prev, newMsg];
+            updateLastMsg(conv.key, next);
+            return next;
+          });
+        }
+      )
+      .subscribe();
   }
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+  // Cleanup Realtime channel on unmount
+  useEffect(() => () => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+  }, []);
 
   async function fetchMsgs(conv: ConvItem) {
     if (conv.type === 'job' && conv.jobId) {
@@ -366,15 +404,35 @@ export default function Messages() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!newMsg.trim() || !selected || !currentUser) return;
+    const msgText = newMsg.trim();
     setSending(true);
     try {
       if (selected.type === 'job' && selected.jobId) {
-        await supabase.from('messages').insert({ job_id: selected.jobId, sender_id: currentUser.id, receiver_id: selected.otherUser.id, message: newMsg.trim() });
+        await supabase.from('messages').insert({
+          job_id: selected.jobId,
+          sender_id: currentUser.id,
+          receiver_id: selected.otherUser.id,
+          message: msgText,
+        });
       } else if (selected.type === 'direct' && selected.conversationId) {
-        await supabase.from('direct_messages').insert({ conversation_id: selected.conversationId, sender_id: currentUser.id, message: newMsg.trim() });
+        await supabase.from('direct_messages').insert({
+          conversation_id: selected.conversationId,
+          sender_id: currentUser.id,
+          message: msgText,
+        });
       }
       setNewMsg('');
-      await fetchMsgs(selected);
+      // No fetchMsgs() needed — Realtime WebSocket delivers the new message
+      // instantly via the channel subscription in selectConv().
+
+      // Notify the recipient
+      await notify([{
+        user_id:  selected.otherUser.id,
+        type:     'new_message',
+        title:    `New message from ${currentUser.full_name}`,
+        body:     msgText.length > 80 ? msgText.slice(0, 80) + '…' : msgText,
+        job_id:   selected.jobId,
+      }]);
     } finally {
       setSending(false);
     }
@@ -390,8 +448,8 @@ export default function Messages() {
     setHiringInProgress(true);
     try {
       const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', currentUser.id).single();
-      if (!wallet) { alert('Could not access wallet.'); return; }
-      if (wallet.available_balance < amount) { alert(`Insufficient balance. You need ₦${(amount - wallet.available_balance).toLocaleString()} more.`); return; }
+      if (!wallet) { toast.error('Could not access wallet.'); return; }
+      if (wallet.available_balance < amount) { toast.error(`You need ₦${(amount - wallet.available_balance).toLocaleString()} more.`, 'Insufficient Balance'); return; }
       await supabase.from('wallets').update({ available_balance: wallet.available_balance - amount, escrow_balance: wallet.escrow_balance + amount, updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
       setWallet({ ...wallet, available_balance: wallet.available_balance - amount, escrow_balance: wallet.escrow_balance + amount, updated_at: new Date().toISOString() });
       await supabase.from('transactions').insert({ user_id: currentUser.id, amount, type: 'escrow_lock', job_id: job.id, description: `Funds locked for "${job.title}"` });
@@ -399,8 +457,19 @@ export default function Messages() {
       await supabase.from('jobs').update({ status: 'in_progress' }).eq('id', job.id);
       await supabase.from('proposals').update({ status: 'accepted' }).eq('id', proposal.id);
       await supabase.from('proposals').update({ status: 'rejected' }).eq('job_id', job.id).neq('id', proposal.id);
+
+      // Notify the freelancer they have been hired
+      await notify([{
+        user_id:    proposal.freelancer_id,
+        type:       'hire_confirmed',
+        title:      'You\'ve been hired! 🎉',
+        body:       `${currentUser.full_name} has confirmed your hire for "${job.title}". ₦${amount.toLocaleString()} is now held in escrow.`,
+        job_id:     job.id,
+        proposal_id: proposal.id,
+      }]);
+
       if (selected) await fetchJobCtx(selected);
-      alert('Hire confirmed! Funds locked in escrow.');
+      toast.success('Funds locked in escrow.', 'Hire Confirmed! 🎉');
     } finally {
       setHiringInProgress(false);
     }
@@ -410,7 +479,7 @@ export default function Messages() {
 
   async function handleUpdateOffer() {
     const parsed = parseFloat(newOfferAmt);
-    if (!jCtx?.proposal?.id || isNaN(parsed) || parsed <= 0) { alert('Enter a valid amount.'); return; }
+    if (!jCtx?.proposal?.id || isNaN(parsed) || parsed <= 0) { toast.warning('Enter a valid amount.'); return; }
     setSavingOffer(true);
     try {
       await supabase.from('proposals').update({ proposed_amount: parsed }).eq('id', jCtx.proposal.id);
@@ -437,11 +506,21 @@ export default function Messages() {
     }
     const { data: fw } = await supabase.from('wallets').select('*').eq('user_id', hire.freelancer_id).single();
     if (fw) {
-      await supabase.from('wallets').update({ available_balance: fw.available_balance + hire.escrow_amount, updated_at: new Date().toISOString() }).eq('user_id', hire.freelancer_id);
+      await supabase.from('wallets').update({ freelancer_balance: fw.freelancer_balance + hire.escrow_amount, updated_at: new Date().toISOString() }).eq('user_id', hire.freelancer_id);
       await supabase.from('transactions').insert({ user_id: hire.freelancer_id, amount: hire.escrow_amount, type: 'escrow_release', job_id: job.id, description: `Payment received for "${job.title}"` });
     }
+
+    // Notify the freelancer that the job is complete and funds are released
+    await notify([{
+      user_id: hire.freelancer_id,
+      type: 'job_complete',
+      title: 'Job Completed & Paid! 💰',
+      body: `${currentUser.full_name} has completed "${job.title}" and released ₦${hire.escrow_amount.toLocaleString()} to your earnings.`,
+      job_id: job.id,
+    }]);
+
     if (selected) await fetchJobCtx(selected);
-    alert('Job completed! Payment released to freelancer.');
+    toast.success('Payment released to freelancer.', 'Job Completed! ✅');
     navigate(`/review/${job.id}`);
   }
 
@@ -489,7 +568,7 @@ export default function Messages() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex overflow-hidden bg-gray-100 h-full min-h-0">
+    <div className="flex flex-1 overflow-hidden bg-transparent w-full">
 
       {/* ════════════ LEFT PANEL — conversation list ════════════ */}
       <div className={`${selected ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex-shrink-0 relative`}>
@@ -590,7 +669,7 @@ export default function Messages() {
       </div>
 
       {/* ════════════ RIGHT PANEL — chat area ════════════ */}
-      <div className={`${!selected ? 'hidden md:flex' : 'flex'} flex-col flex-1 overflow-hidden`}>
+      <div className={`${!selected ? 'hidden md:flex' : 'flex'} flex-col flex-1 overflow-hidden min-h-0`}>
         {!selected ? (
           /* Empty state — desktop only */
           <div className="hidden md:flex flex-col items-center justify-center h-full text-center bg-white">
@@ -604,7 +683,7 @@ export default function Messages() {
           <>
             {/* ── Chat header ── */}
             <div className="flex items-center gap-3 px-4 py-3 bg-white border-b shadow-sm flex-shrink-0">
-              <button onClick={() => { setSelected(null); if (pollRef.current) clearInterval(pollRef.current); }} className="md:hidden text-gray-500 hover:text-gray-900 mr-1">
+              <button onClick={() => { setSelected(null); if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; } }} className="md:hidden text-gray-500 hover:text-gray-900 mr-1">
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-blue-400 flex items-center justify-center flex-shrink-0">

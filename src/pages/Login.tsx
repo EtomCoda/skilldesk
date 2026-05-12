@@ -15,6 +15,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
   const setCurrentUser = useStore((state) => state.setCurrentUser);
   const setViewMode = useStore((state) => state.setViewMode);
 
@@ -84,9 +85,7 @@ export default function Login({ onLogin }: LoginProps) {
                 escrow_balance: 0,
               });
 
-            setCurrentUser(profileData);
-            setViewMode(signupRole);
-            onLogin();
+            setSignupSuccess(true);
           } else {
             // If inserted but returned nothing, maybe just fetch it
             const { data: fallbackProfile } = await supabase
@@ -96,9 +95,7 @@ export default function Login({ onLogin }: LoginProps) {
               .maybeSingle();
               
             if (fallbackProfile) {
-              setCurrentUser(fallbackProfile);
-              setViewMode(signupRole);
-              onLogin();
+              setSignupSuccess(true);
             } else {
               throw new Error('Profile creation failed. Please try again.');
             }
@@ -130,7 +127,11 @@ export default function Login({ onLogin }: LoginProps) {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      if (err.message?.includes('over_email_send_rate_limit') || err.code === 'over_email_send_rate_limit') {
+        setError('Too many emails have been sent to this email address. Please wait a while before trying again.');
+      } else {
+        setError(err.message || 'An error occurred. Please try again.');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -169,119 +170,141 @@ export default function Login({ onLogin }: LoginProps) {
           </div>
 
           <div className="p-8">
-            <form onSubmit={handleAuth} className="space-y-5">
-              {mode === 'signup' && (
-                <>
-                  <div className="space-y-3 mb-4">
-                    <label className="text-sm font-bold text-gray-700 ml-1">I want to:</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setSignupRole('buying')}
-                        className={`py-3 px-4 rounded-xl border-2 font-semibold transition-all ${
-                          signupRole === 'buying'
-                            ? 'border-blue-600 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                      >
-                        Hire Talent
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSignupRole('selling')}
-                        className={`py-3 px-4 rounded-xl border-2 font-semibold transition-all ${
-                          signupRole === 'selling'
-                            ? 'border-blue-600 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                      >
-                        Find Work
-                      </button>
+            {signupSuccess ? (
+              <div className="text-center py-8 space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-2">
+                  <Mail className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Confirm Your Email</h3>
+                <p className="text-gray-600">
+                  A verification link has been sent to <span className="font-semibold text-blue-600">{email}</span>. 
+                  Please click the link in the email to activate your account. <strong>After clicking, you will be automatically logged into the application.</strong>
+                </p>
+                <button
+                  onClick={() => {
+                    setSignupSuccess(false);
+                    setMode('login');
+                  }}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all mt-4"
+                >
+                  Back to Login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleAuth} className="space-y-5">
+                {mode === 'signup' && (
+                  <>
+                    <div className="space-y-3 mb-4">
+                      <label className="text-sm font-bold text-gray-700 ml-1">I want to:</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole('buying')}
+                          className={`py-3 px-4 rounded-xl border-2 font-semibold transition-all ${
+                            signupRole === 'buying'
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          Hire Talent
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole('selling')}
+                          className={`py-3 px-4 rounded-xl border-2 font-semibold transition-all ${
+                            signupRole === 'selling'
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          Find Work
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                    <label htmlFor="fullName" className="text-sm font-bold text-gray-700 ml-1">
+                      Full Name
+                    </label>
+                    <div className="relative group">
+                      <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                      <input
+                        id="fullName"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Enter your full name"
+                        className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                        required
+                      />
                     </div>
                   </div>
+                </>
+              )}
 
-                  <div className="space-y-1.5">
-                  <label htmlFor="fullName" className="text-sm font-bold text-gray-700 ml-1">
-                    Full Name
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="text-sm font-bold text-gray-700 ml-1">
+                    PAU Email Address
                   </label>
                   <div className="relative group">
-                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                     <input
-                      id="fullName"
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Enter your full name"
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@pau.edu.ng"
                       className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                       required
                     />
                   </div>
                 </div>
-              </>
-            )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-bold text-gray-700 ml-1">
-                  PAU Email Address
-                </label>
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@pau.edu.ng"
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                    required
-                  />
+                <div className="space-y-1.5">
+                  <label htmlFor="password" className="text-sm font-bold text-gray-700 ml-1">
+                    Password
+                  </label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="password" className="text-sm font-bold text-gray-700 ml-1">
-                  Password
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                  <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium animate-shake">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
-              >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : mode === 'login' ? (
-                  <>
-                    <LogIn className="w-5 h-5" />
-                    Login to My Account
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-5 h-5" />
-                    Create Profile
-                  </>
+                {error && (
+                  <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium animate-shake">
+                    {error}
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : mode === 'login' ? (
+                    <>
+                      <LogIn className="w-5 h-5" />
+                      Login to My Account
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-5 h-5" />
+                      Create Profile
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

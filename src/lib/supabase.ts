@@ -12,6 +12,7 @@ export interface User {
   avatar_url?: string;
   bio?: string;
   skills?: string;
+  is_admin?: boolean;
   created_at: string;
 }
 
@@ -20,6 +21,7 @@ export interface Wallet {
   user_id: string;
   available_balance: number;
   escrow_balance: number;
+  freelancer_balance: number;
   created_at: string;
   updated_at: string;
 }
@@ -71,7 +73,7 @@ export interface Transaction {
   id: string;
   user_id: string;
   amount: number;
-  type: 'escrow_lock' | 'escrow_release' | 'withdrawal' | 'deposit';
+  type: 'escrow_lock' | 'escrow_release' | 'withdrawal' | 'deposit' | 'transfer_to_client' | 'client_withdrawal';
   job_id?: string;
   description: string;
   created_at: string;

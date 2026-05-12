@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search,Clock } from 'lucide-react';
-import { supabase, Job, User } from '../lib/supabase';
+import { supabase, Job, User } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
 interface JobWithClient extends Job {
   client: User;
 }
@@ -11,6 +12,32 @@ export default function FindWork() {
   const [jobs, setJobs] = useState<JobWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const currentUser = useStore((s) => s.currentUser);
+  const firstName = currentUser?.full_name?.split(' ')[0] || 'Freelancer';
+
+  const getMotivationalGreeting = () => {
+    const greetings = [
+      "Let's find your next great gig today!",
+      "Ready to crush your next project?",
+      "New opportunities are waiting for you.",
+      "Let's make some magic happen today.",
+      "Time to put those skills to work!",
+      "Discover jobs that match your expertise."
+    ];
+    
+    const date = new Date();
+    const month = date.getMonth();
+    const day = date.getDate();
+    
+    // Holidays
+    if (month === 11 && day >= 24 && day <= 26) return "Happy Holidays! Ready for a festive gig?";
+    if (month === 0 && day <= 3) return "Happy New Year! Let's start the year with a great gig.";
+    if (month === 1 && day === 14) return "Happy Valentine's Day! Find a gig you love today.";
+    if (month === 9 && day === 31) return "Happy Halloween! No tricks here, just great gigs.";
+    
+    const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
+    return greetings[dayOfYear % greetings.length];
+  };
 
   useEffect(() => {
     fetchJobs();
@@ -82,7 +109,11 @@ export default function FindWork() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-blue-950 mb-4">Find Work</h1>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-blue-950">Welcome back, {firstName}! 👋</h1>
+            <p className="text-gray-600 mt-2 text-lg">{getMotivationalGreeting()}</p>
+          </div>
+          
           <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input

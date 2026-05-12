@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, User } from 'lucide-react';
-import { supabase, User as UserType } from '../lib/supabase';
-import { useStore } from '../store/useStore';
+import { supabase, User as UserType } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
 
 export default function BrowseFreelancers() {
   const currentUser = useStore((state) => state.currentUser);

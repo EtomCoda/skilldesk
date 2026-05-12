@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {User, MessageSquare, CheckCircle, Clock, MessageCircle } from 'lucide-react';
 import { supabase, Job, User as UserType, Proposal, Hire } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notifications';
 
 interface ProposalWithFreelancer extends Proposal {
   freelancer: UserType;
@@ -99,6 +100,15 @@ export default function JobDetails() {
         });
 
       if (error) throw error;
+
+      // Notify the job's client
+      await notify([{
+        user_id: job.client_id,
+        type: 'new_proposal',
+        title: '📩 New proposal received',
+        body: `${currentUser.full_name} submitted a proposal for "₦${parseFloat(proposedAmount).toLocaleString()}" on "${job.title}".`,
+        job_id: job.id,
+      }]);
 
       setShowProposalForm(false);
       fetchJobDetails();
@@ -214,7 +224,7 @@ export default function JobDetails() {
                 <p className="text-gray-700 whitespace-pre-wrap">{job.description}</p>
               </div>
 
-              {!isJobOwner && !hasApplied && job.status === 'open' && !showProposalForm && (
+              {!isJobOwner && !hasApplied && job.status === 'open' && !showProposalForm && !currentUser?.is_admin && (
                 <button
                   onClick={() => setShowProposalForm(true)}
                   className="mt-6 w-full bg-blue-950 text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition-colors"
@@ -304,7 +314,7 @@ export default function JobDetails() {
 
               {proposals.length === 0 ? (
                 <p className="text-gray-600 text-sm">No proposals yet</p>
-              ) : isJobOwner ? (
+              ) : isJobOwner || currentUser?.is_admin ? (
                 <div className="space-y-4">
                   {proposals.map((proposal) => (
                     <div key={proposal.id} className="border border-gray-200 rounded-lg p-4">
@@ -320,7 +330,7 @@ export default function JobDetails() {
                         {proposal.cover_letter}
                       </p>
 
-                      {job.status === 'open' && !hire && (
+                      {job.status === 'open' && !hire && !currentUser?.is_admin && (
                         <button
                           onClick={() =>
                             navigate(
@@ -334,7 +344,7 @@ export default function JobDetails() {
                         </button>
                       )}
 
-                      {proposal.status === 'accepted' && (
+                      {proposal.status === 'accepted' && !currentUser?.is_admin && (
                         <button
                           onClick={() => navigate(`/messages?autoJobId=${job.id}`)}
                           className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"

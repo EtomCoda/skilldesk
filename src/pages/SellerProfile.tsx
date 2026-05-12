@@ -4,6 +4,7 @@ import { Star, MessageCircle, Plus, Edit3 } from 'lucide-react';
 import { supabase, User as UserType } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import SkillInput from '../components/SkillInput';
+import { useToast } from '../lib/toast';
 
 interface Portfolio {
   id: string;
@@ -47,6 +48,7 @@ export default function SellerProfile() {
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const setCurrentUser = useStore((state) => state.setCurrentUser);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (sellerId) {
@@ -98,7 +100,7 @@ export default function SellerProfile() {
 
   const handleSendChatRequest = async () => {
     if (!currentUser || !seller || !chatData.jobTitle || !chatData.budget || !chatData.description) {
-      alert('Please fill in all fields');
+      toast.warning('Please fill in all fields.');
       return;
     }
 
@@ -115,12 +117,12 @@ export default function SellerProfile() {
 
       if (error) throw error;
 
-      alert('Chat request sent! The freelancer will review your request soon.');
+      toast.success('The freelancer will review your request soon.', 'Chat Request Sent!');
       setShowChatModal(false);
       setChatData({ jobTitle: '', budget: '', description: '' });
     } catch (err) {
       console.error('Error sending chat request:', err);
-      alert('Failed to send chat request');
+      toast.error('Failed to send chat request. Please try again.');
     } finally {
       setSending(false);
     }
@@ -129,21 +131,35 @@ export default function SellerProfile() {
   const openEditModal = () => {
     setEditBio(seller?.bio || '');
     // Parse existing comma-separated skills string into an array
-    setEditSkills(
-      seller?.skills
-        ? seller.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
-        : []
-    );
+    const existingSkills = seller?.skills
+      ? seller.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    setEditSkills(existingSkills);
     setShowEditModal(true);
   };
 
   const handleSaveProfile = async () => {
     if (!currentUser) return;
+    
+    const trimmedBio = editBio.trim();
+    if (trimmedBio.length > 0 && trimmedBio.length < 20) {
+      toast.warning('Please provide a bio of at least 20 characters.');
+      return;
+    }
+
+    if (editSkills.length > 15) {
+      toast.warning('Please limit your skills to 15 items.');
+      return;
+    }
+
     setSaving(true);
     try {
       const { data, error } = await supabase
         .from('users')
-        .update({ bio: editBio, skills: editSkills.join(', ') })
+        .update({ 
+          bio: trimmedBio, 
+          skills: editSkills.join(', ') 
+        })
         .eq('id', currentUser.id)
         .select()
         .single();
@@ -153,10 +169,10 @@ export default function SellerProfile() {
       setSeller(data);
       setCurrentUser(data);
       setShowEditModal(false);
-      alert('Profile updated successfully!');
+      toast.success('Your profile has been updated.', 'Profile Saved!');
     } catch (err) {
       console.error('Error updating profile:', err);
-      alert('Failed to update profile.');
+      toast.error('Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -443,21 +459,35 @@ export default function SellerProfile() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">Bio</label>
+                  <span className={`text-[10px] font-medium ${editBio.length < 20 ? 'text-amber-600' : 'text-gray-400'}`}>
+                    {editBio.length} / 500 characters (min 20)
+                  </span>
+                </div>
                 <textarea
                   value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  placeholder="Tell clients about yourself..."
+                  onChange={(e) => setEditBio(e.target.value.slice(0, 500))}
+                  placeholder="Tell clients about your experience, expertise, and what makes you unique..."
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm"
                 />
+                <p className="text-[10px] text-gray-400 mt-1">A professional bio helps you stand out. Avoid all-caps or excessive emojis.</p>
               </div>
 
-              <SkillInput
-                skills={editSkills}
-                onChange={setEditSkills}
-                label="Your Skills"
-              />
+              <div>
+                <SkillInput
+                  skills={editSkills}
+                  onChange={setEditSkills}
+                  label="Your Skills"
+                />
+                <div className="flex justify-between mt-1">
+                  <p className="text-[10px] text-gray-400">Add up to 15 skills to help clients find you.</p>
+                  <span className={`text-[10px] font-medium ${editSkills.length >= 15 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {editSkills.length} / 15
+                  </span>
+                </div>
+              </div>
 
               <div className="flex gap-4 pt-4">
                 <button

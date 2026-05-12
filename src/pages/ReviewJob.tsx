@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Star, ArrowLeft } from 'lucide-react';
 import { supabase, Job, User as UserType } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { useToast } from '../lib/toast';
 
 export default function ReviewJob() {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const currentUser = useStore((state) => state.currentUser);
+  const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [otherUser, setOtherUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,8 +72,10 @@ export default function ReviewJob() {
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser || !job || !otherUser || !comment.trim()) {
-      alert('Please provide a comment');
+    const trimmedComment = comment.trim();
+    if (!currentUser || !job || !otherUser) return;
+    if (trimmedComment.length < 20) {
+      toast.warning('Please write at least 20 characters in your review.');
       return;
     }
 
@@ -80,7 +84,7 @@ export default function ReviewJob() {
       if (existingReview) {
         await supabase
           .from('reviews')
-          .update({ rating, comment })
+          .update({ rating, comment: trimmedComment })
           .eq('job_id', jobId)
           .eq('reviewer_id', currentUser.id);
       } else {
@@ -89,7 +93,7 @@ export default function ReviewJob() {
           reviewer_id: currentUser.id,
           reviewee_id: otherUser.id,
           rating,
-          comment,
+          comment: trimmedComment,
         });
       }
 
@@ -122,11 +126,11 @@ export default function ReviewJob() {
         );
       }
 
-      alert('Review submitted successfully!');
+      toast.success('Your review has been posted.', 'Review Submitted!');
       navigate(-1);
     } catch (err) {
       console.error('Error submitting review:', err);
-      alert('Failed to submit review');
+      toast.error('Failed to submit review. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -206,18 +210,24 @@ export default function ReviewJob() {
             </div>
 
             <div>
-              <label htmlFor="comment" className="block text-lg font-semibold text-gray-900 mb-3">
-                Your Feedback
-              </label>
+              <div className="flex justify-between items-end mb-3">
+                <label htmlFor="comment" className="block text-lg font-semibold text-gray-900">
+                  Your Feedback
+                </label>
+                <span className={`text-[10px] font-medium ${comment.length < 20 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {comment.length} / 1000 chars (min 20)
+                </span>
+              </div>
               <textarea
                 id="comment"
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => setComment(e.target.value.slice(0, 1000))}
                 placeholder="Share your experience working together. What went well? What could be improved?"
                 rows={8}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
                 required
               />
+              <p className="text-[10px] text-gray-400 mt-1">Be honest and professional. Reviews are public and help maintain a trustworthy marketplace.</p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

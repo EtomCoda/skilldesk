@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { GraduationCap, Wallet, LogOut, ShoppingBag, Briefcase, Menu, X, MessageCircle, TrendingUp } from 'lucide-react';
+import { GraduationCap, Wallet, LogOut, ShoppingBag, Briefcase, Menu, X, MessageCircle, TrendingUp, ShieldCheck, Headset, PlusCircle, Users, Search, FileText, Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import NotificationBell from './NotificationBell';
 
 interface NavbarProps {
   onLogout: () => void;
@@ -66,38 +67,101 @@ export default function Navbar({ onLogout }: NavbarProps) {
   const initials = currentUser?.full_name?.charAt(0)?.toUpperCase() || '?';
   const firstName = currentUser?.full_name?.split(' ')[0] || '';
 
+  // ── PURE ADMIN VIEW ──
+  if (currentUser?.is_admin) {
+    return (
+      <nav className="bg-white shadow-lg border-b-4 border-blue-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link to="/admin" className="flex items-center gap-2 font-bold text-xl text-blue-900">
+              <ShieldCheck className="w-8 h-8" />
+              <span className="hidden sm:inline">SkillDesk Admin</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-6">
+              <button onClick={onLogout} className="flex items-center gap-2 text-gray-500 hover:text-red-600 transition-colors">
+                <LogOut className="w-5 h-5" />
+                <span className="font-medium text-sm">Logout</span>
+              </button>
+            </div>
+
+            <div className="md:hidden flex items-center">
+              <button
+                className="p-2 text-blue-900"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 hidden md:block">
+            <div className="flex gap-2 py-2">
+              <Link to="/admin" className={navLink(isActive('/admin') && location.pathname === '/admin', true)}>Dashboard</Link>
+              <Link to="/admin/users" className={navLink(isActive('/admin/users'), true)}>Users</Link>
+              <Link to="/admin/jobs" className={navLink(isActive('/admin/jobs'), true)}>Jobs</Link>
+              <Link to="/admin/support" className={navLink(isActive('/admin/support'), true)}>Support Tickets</Link>
+            </div>
+          </div>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-gray-50 border-t p-4 space-y-2">
+            <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Dashboard</Link>
+            <Link to="/admin/users" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Users</Link>
+            <Link to="/admin/jobs" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Jobs</Link>
+            <Link to="/admin/support" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Support Tickets</Link>
+            <button
+              onClick={() => { onLogout(); setMobileMenuOpen(false); }}
+              className="w-full text-left flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50 mt-4"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        )}
+      </nav>
+    );
+  }
+
+  // ── CLIENT / FREELANCER VIEW ──
+  // Palette: #ECE8EF (soft off-white) & #2563eb (blue) & #0E0E52 (deep navy)
+  // Client  → white navbar, blue accents, #ECE8EF tint
+  // Freelancer → #0E0E52 navbar (inverted), #ECE8EF accents
+  const isClient = viewMode === 'buying';
+  const BLUE   = '#2563eb';
+  const NAVY   = '#0E0E52';
+  const CREAM  = '#ECE8EF';
+
+  const navBg          = isClient ? '#ffffff' : NAVY;
+  const navText        = isClient ? '#111827' : CREAM;
+  const navAccent      = isClient ? BLUE      : CREAM;
+  const navBorderColor = isClient ? BLUE      : CREAM;
+  const navBadgeBg     = isClient ? BLUE      : CREAM;
+  const navBadgeText   = isClient ? '#fff'    : NAVY;
+  const navHoverBg     = isClient ? '#f3f4f6' : 'rgba(236,232,239,0.1)';
+  const navToggleBg    = isClient ? 'rgba(37,99,235,0.06)' : 'rgba(236,232,239,0.1)';
+  const modeLabel      = isClient ? 'You are in Client Mode' : 'You are in Freelancer Mode';
+
   return (
-    <nav className="bg-white shadow-lg border-b-4" style={{ borderBottomColor: 'rgb(37, 99, 235)' }}>
+    <nav
+      className="shadow-lg border-b-4 transition-all duration-500 sticky top-0 z-50"
+      style={{ backgroundColor: navBg, borderBottomColor: navBorderColor }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Top bar */}
         <div className="flex items-center h-16 relative">
 
           {/* LEFT: Logo only */}
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl flex-shrink-0" style={{ color: 'rgb(37, 99, 235)' }}>
+          <Link
+            to="/"
+            className="flex items-center gap-2 font-bold text-xl flex-shrink-0 transition-colors duration-300"
+            style={{ color: navAccent }}
+          >
             <GraduationCap className="w-8 h-8" />
             <span className="hidden sm:inline">SkillDesk</span>
           </Link>
-
-          {/* CENTER: Mode badge + wallet — absolutely centered on mobile */}
-          <div className="md:hidden absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <button
-              onClick={handleModeToggle}
-              className="text-xs px-2.5 py-1.5 rounded-lg font-semibold border border-blue-200 leading-none whitespace-nowrap"
-              style={{ color: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.07)' }}
-            >
-              {viewMode === 'buying' ? 'Client Mode' : 'Freelancer Mode'}
-            </button>
-            {viewMode === 'buying' ? (
-              <Link to="/wallet" className="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-lg leading-none whitespace-nowrap">
-                {wallet ? `₦${wallet.available_balance.toLocaleString()}` : 'Wallet'}
-              </Link>
-            ) : (
-              <Link to="/my-earnings" className="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-lg leading-none whitespace-nowrap">
-                {freelancerEarnings !== null ? `₦${freelancerEarnings.toLocaleString()}` : 'Earnings'}
-              </Link>
-            )}
-          </div>
 
           {/* Push desktop right-group to far right; on mobile this is a spacer */}
           <div className="flex-1" />
@@ -106,39 +170,42 @@ export default function Navbar({ onLogout }: NavbarProps) {
           <div className="hidden md:flex items-center gap-3">
             {/* Mode toggle */}
             <div
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all cursor-pointer hover:shadow-md"
-              style={{ borderColor: 'rgb(37, 99, 235)', backgroundColor: 'rgba(37, 99, 235, 0.05)' }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-300 cursor-pointer hover:opacity-90"
+              style={{ borderColor: navAccent, backgroundColor: navToggleBg }}
               onClick={handleModeToggle}
             >
               <button className="flex items-center gap-2">
-                {viewMode === 'buying' ? (
+                {isClient ? (
                   <>
-                    <ShoppingBag className="w-5 h-5" style={{ color: 'rgb(37, 99, 235)' }} />
-                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>You are in Client Mode</span>
+                    <ShoppingBag className="w-5 h-5 transition-colors duration-300" style={{ color: navAccent }} />
+                    <span className="font-semibold transition-colors duration-300" style={{ color: navAccent }}>{modeLabel}</span>
                   </>
                 ) : (
                   <>
-                    <Briefcase className="w-5 h-5" style={{ color: 'rgb(37, 99, 235)' }} />
-                    <span className="font-semibold" style={{ color: 'rgb(37, 99, 235)' }}>You are in Freelancer Mode</span>
+                    <Briefcase className="w-5 h-5 transition-colors duration-300" style={{ color: navAccent }} />
+                    <span className="font-semibold transition-colors duration-300" style={{ color: navAccent }}>{modeLabel}</span>
                   </>
                 )}
               </button>
             </div>
 
             {/* Wallet (client only) or Earnings (freelancer only) */}
-            {viewMode === 'buying' ? (
+            {isClient ? (
               <Link
                 to="/wallet"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/wallet') ? 'bg-gray-100' : 'hover:bg-gray-50'
-                }`}
-                style={{ color: isActive('/wallet') ? 'rgb(37, 99, 235)' : 'rgb(17, 24, 39)' }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
+                style={{
+                  color: isActive('/wallet') ? BLUE : navText,
+                  backgroundColor: isActive('/wallet') ? navHoverBg : 'transparent',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = navHoverBg)}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = isActive('/wallet') ? navHoverBg : 'transparent')}
               >
                 <Wallet className="w-5 h-5" />
                 <div className="flex flex-col items-start leading-none">
                   <span className="text-sm font-medium">Wallet</span>
                   {wallet && (
-                    <span className="text-[10px] font-bold text-green-600">
+                    <span className="text-[10px] font-bold text-green-500">
                       ₦{wallet.available_balance.toLocaleString()}
                     </span>
                   )}
@@ -147,16 +214,19 @@ export default function Navbar({ onLogout }: NavbarProps) {
             ) : (
               <Link
                 to="/my-earnings"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/my-earnings') ? 'bg-gray-100' : 'hover:bg-gray-50'
-                }`}
-                style={{ color: isActive('/my-earnings') ? 'rgb(37, 99, 235)' : 'rgb(17, 24, 39)' }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
+                style={{
+                  color: isActive('/my-earnings') ? CREAM : navText,
+                  backgroundColor: isActive('/my-earnings') ? navHoverBg : 'transparent',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = navHoverBg)}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = isActive('/my-earnings') ? navHoverBg : 'transparent')}
               >
                 <TrendingUp className="w-5 h-5" />
                 <div className="flex flex-col items-start leading-none">
                   <span className="text-sm font-medium">Earnings</span>
                   {freelancerEarnings !== null && (
-                    <span className="text-[10px] font-bold text-green-600">
+                    <span className="text-[10px] font-bold text-green-400">
                       ₦{freelancerEarnings.toLocaleString()}
                     </span>
                   )}
@@ -164,52 +234,93 @@ export default function Navbar({ onLogout }: NavbarProps) {
               </Link>
             )}
 
-            {/* User avatar — only way to reach profile */}
+            {/* Avatar / Profile */}
             <button
               onClick={goToProfile}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-              title={`View ${viewMode === 'selling' ? 'freelancer' : 'client'} profile`}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all"
+              style={{ borderColor: navAccent }}
+              title={`View ${isClient ? 'client' : 'freelancer'} profile`}
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: 'rgb(37, 99, 235)' }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors duration-300"
+                style={{ backgroundColor: navBadgeBg, color: navBadgeText }}
               >
                 {initials}
               </div>
-              <span className="text-sm font-semibold text-gray-800 max-w-[100px] truncate">{firstName}</span>
+              <span className="text-sm font-semibold max-w-[100px] truncate" style={{ color: navText }}>{firstName}</span>
             </button>
+
+            {/* Help & Support — Icon Only */}
+            <Link
+              to="/support"
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: isActive('/support') ? navAccent : (isClient ? '#6b7280' : 'rgba(236,232,239,0.6)') }}
+              title="Help & Support"
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = navHoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Headset className="w-5 h-5" />
+            </Link>
+
+            {/* Notification Bell */}
+            <NotificationBell />
 
             {/* Logout — icon only */}
             <button
               onClick={onLogout}
-              className="p-2 rounded-lg hover:bg-red-50 transition-colors text-gray-500 hover:text-red-500"
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: isClient ? '#6b7280' : 'rgba(236,232,239,0.6)' }}
               title="Logout"
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = isClient ? '#fee2e2' : 'rgba(220,38,38,0.15)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
               <LogOut className="w-5 h-5" />
             </button>
           </div>
 
-          {/* RIGHT: Mobile — chat icon + hamburger */}
-          <div className="md:hidden flex items-center flex-shrink-0">
+          {/* RIGHT: Mobile — compact controls */}
+          <div className="md:hidden flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            {/* Compact Mode Toggle */}
+            <button
+              onClick={handleModeToggle}
+              className="text-[10px] sm:text-xs px-2 py-1.5 rounded-lg font-bold border leading-none whitespace-nowrap transition-all"
+              style={{ color: navAccent, borderColor: navAccent, backgroundColor: navToggleBg }}
+            >
+              {isClient ? 'Client' : 'Freelancer'}
+            </button>
+
+            {/* Compact Wallet */}
+            {isClient ? (
+              <Link to="/wallet" className="text-[10px] sm:text-xs font-bold text-green-600 bg-green-50 border border-green-100 px-2 py-1.5 rounded-lg leading-none whitespace-nowrap">
+                {wallet ? `₦${(wallet.available_balance / 1000).toFixed(1)}k` : '₦0'}
+              </Link>
+            ) : (
+              <Link to="/my-earnings" className="text-[10px] sm:text-xs font-bold text-green-600 bg-green-50 border border-green-100 px-2 py-1.5 rounded-lg leading-none whitespace-nowrap">
+                {freelancerEarnings !== null ? `₦${(freelancerEarnings / 1000).toFixed(1)}k` : '₦0'}
+              </Link>
+            )}
+
             <Link
               to="/messages"
-              className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+              className="relative p-1.5 transition-colors"
+              style={{ color: isClient ? '#6b7280' : 'rgba(236,232,239,0.6)' }}
             >
-              <MessageCircle className="w-6 h-6" />
+              <MessageCircle className="w-5 h-5" />
               {pendingRequestsCount > 0 && (
-                <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center border border-white">
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full border border-white">
                   {pendingRequestsCount}
                 </span>
               )}
             </Link>
+
             <button
-              className="p-2 flex items-center gap-1.5"
+              className="p-1.5 flex items-center gap-1 transition-colors duration-300"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ color: 'rgb(37, 99, 235)' }}
+              style={{ color: navAccent }}
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ backgroundColor: 'rgb(37, 99, 235)' }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors duration-300"
+                style={{ backgroundColor: navBadgeBg, color: navBadgeText }}
               >
                 {initials}
               </div>
@@ -221,17 +332,17 @@ export default function Navbar({ onLogout }: NavbarProps) {
 
 
         {/* Sub-nav — strictly mode-separated (Desktop only) */}
-        <div className="border-t hidden md:block" style={{ borderTopColor: 'rgba(37, 99, 235, 0.1)' }}>
+        <div className="border-t hidden md:block transition-colors duration-300" style={{ borderTopColor: isClient ? 'rgba(37,99,235,0.1)' : 'rgba(236,232,239,0.15)' }}>
           <div className="flex gap-1 py-2 overflow-x-auto">
-            {viewMode === 'buying' ? (
+            {isClient ? (
               /* ── CLIENT mode ── */
               <>
-                <Link to="/post-job" className={navLink(isActive('/post-job'))}>Post a Job</Link>
-                <Link to="/my-hires" className={navLink(isActive('/my-hires'))}>Posted Jobs</Link>
-                <Link to="/browse-freelancers" className={navLink(isActive('/browse-freelancers'))}>Browse Freelancers</Link>
+                <Link to="/my-hires" className={navLink(isActive('/my-hires'), isClient)}>My Posted Jobs</Link>
+                <Link to="/ongoing-jobs" className={navLink(isActive('/ongoing-jobs'), isClient)}>Ongoing Jobs</Link>
+                <Link to="/browse-freelancers" className={navLink(isActive('/browse-freelancers'), isClient)}>Browse Freelancers</Link>
                 <Link
                   to="/messages"
-                  className={`${navLink(isActive('/messages'))} flex items-center gap-1.5`}
+                  className={`${navLink(isActive('/messages'), isClient)} flex items-center gap-1.5`}
                 >
                   <MessageCircle className="w-4 h-4" />
                   Messages
@@ -240,11 +351,11 @@ export default function Navbar({ onLogout }: NavbarProps) {
             ) : (
               /* ── FREELANCER mode ── */
               <>
-                <Link to="/find-work" className={navLink(isActive('/find-work'))}>Find Work</Link>
-                <Link to="/my-proposals" className={navLink(isActive('/my-proposals'))}>My Proposals</Link>
+                <Link to="/find-work" className={navLink(isActive('/find-work'), isClient)}>Find Work</Link>
+                <Link to="/my-proposals" className={navLink(isActive('/my-proposals'), isClient)}>My Proposals</Link>
                 <Link
                   to="/messages"
-                  className={`${navLink(isActive('/messages'))} relative flex items-center gap-1.5`}
+                  className={`${navLink(isActive('/messages'), isClient)} relative flex items-center gap-1.5`}
                 >
                   <MessageCircle className="w-4 h-4" />
                   Messages
@@ -262,22 +373,25 @@ export default function Navbar({ onLogout }: NavbarProps) {
 
       {/* Mobile drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-gray-50 border-t p-4">
+        <div
+          className="md:hidden border-t p-4"
+          style={{ backgroundColor: isClient ? '#f9fafb' : '#0a0a40', borderTopColor: navBorderColor }}
+        >
           <div className="space-y-2">
-            {/* User info card */}
             <button
               onClick={() => { goToProfile(); setMobileMenuOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-white rounded-lg border border-gray-100 hover:border-blue-200 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left"
+              style={{ backgroundColor: isClient ? '#fff' : 'rgba(236,232,239,0.08)', borderColor: isClient ? '#e5e7eb' : 'rgba(236,232,239,0.2)' }}
             >
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                style={{ backgroundColor: 'rgb(37, 99, 235)' }}
+                className="w-9 h-9 rounded-full flex items-center justify-center font-bold flex-shrink-0 transition-colors duration-300"
+                style={{ backgroundColor: navBadgeBg, color: navBadgeText }}
               >
                 {initials}
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">{currentUser?.full_name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="font-semibold text-sm" style={{ color: navText }}>{currentUser?.full_name}</p>
+                <p className="text-xs" style={{ color: isClient ? '#6b7280' : 'rgba(236,232,239,0.5)' }}>
                   {viewMode === 'selling' ? 'View freelancer profile' : 'View client profile'}
                 </p>
               </div>
@@ -285,26 +399,53 @@ export default function Navbar({ onLogout }: NavbarProps) {
 
             {/* Mode-specific Nav Links */}
             <div className="py-2 space-y-1">
-              {viewMode === 'buying' ? (
+              {isClient ? (
                 <>
-                  <Link to="/post-job" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Post a Job</Link>
-                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Posted Jobs</Link>
-                  <Link to="/browse-freelancers" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Browse Freelancers</Link>
+                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                    <Briefcase className="w-4 h-4" />
+                    My Posted Jobs
+                  </Link>
+                  <Link to="/ongoing-jobs" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                    <Clock className="w-4 h-4" />
+                    Ongoing Jobs
+                  </Link>
+                  <Link to="/browse-freelancers" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                    <Users className="w-4 h-4" />
+                    Browse Freelancers
+                  </Link>
                 </>
               ) : (
                 <>
-                  <Link to="/find-work" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Find Work</Link>
-                  <Link to="/my-proposals" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">My Proposals</Link>
+                  <Link to="/find-work" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg" style={{ color: CREAM }}>
+                    <Search className="w-4 h-4" />
+                    Find Work
+                  </Link>
+                  <Link to="/my-proposals" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg" style={{ color: CREAM }}>
+                    <FileText className="w-4 h-4" />
+                    My Proposals
+                  </Link>
                 </>
               )}
             </div>
 
+            <Link
+              to="/support"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium mt-2"
+              style={{ color: isClient ? '#374151' : CREAM }}
+            >
+              <Headset className="w-4 h-4" />
+              Help & Support
+            </Link>
+
             <button
               onClick={() => { onLogout(); setMobileMenuOpen(false); }}
-              className="w-full text-left px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50 mt-2"
+              className="w-full text-left flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-red-500 hover:bg-red-50/30 mt-1"
             >
+              <LogOut className="w-4 h-4" />
               Logout
             </button>
+
           </div>
         </div>
       )}
@@ -312,9 +453,18 @@ export default function Navbar({ onLogout }: NavbarProps) {
   );
 }
 
-// Shared nav link class helper
-function navLink(active: boolean) {
+// Shared nav link class helper — used only for the sub-nav row
+function navLink(active: boolean, isClient: boolean) {
+  const BLUE  = '#2563eb';
+  const CREAM = '#ECE8EF';
+  const NAVY  = '#0E0E52';
+  if (isClient) {
+    return `px-4 py-2 rounded-lg transition-colors whitespace-nowrap font-medium ${
+      active ? 'bg-blue-50 text-blue-600' : 'text-gray-800 hover:bg-gray-100'
+    }`;
+  }
+  // Freelancer: sub-nav is still on the white navbar background (sub-nav inherits nav bg)
   return `px-4 py-2 rounded-lg transition-colors whitespace-nowrap font-medium ${
-    active ? 'bg-gray-100 text-blue-600' : 'text-gray-900 hover:bg-gray-50'
+    active ? 'bg-[#ECE8EF]/20 text-[#ECE8EF]' : 'text-[#ECE8EF]/70 hover:bg-[#ECE8EF]/10'
   }`;
 }

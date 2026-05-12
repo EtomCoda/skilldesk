@@ -1,9 +1,13 @@
 import { useStore } from '../store/useStore';
 import { Briefcase, ShoppingBag, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const { currentUser, viewMode } = useStore();
+
+  if (currentUser?.is_admin) {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

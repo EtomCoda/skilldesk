@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, ArrowLeft, Link as LinkIcon, Image } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useStore } from '../store/useStore';
+import { supabase } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
 
 const CATEGORIES = [
   'Graphic Design',
@@ -38,6 +38,17 @@ export default function AddPortfolioItem() {
       return;
     }
 
+    const trimmedTitle = title.trim();
+    const trimmedDesc  = description.trim();
+
+    if (trimmedTitle.length < 5) {
+      setError('Project title must be at least 5 characters.');
+      return;
+    }
+    if (trimmedDesc.length < 30) {
+      setError('Description must be at least 30 characters. Tell clients what you built and how.');
+      return;
+    }
     if (!imageUrl.trim()) {
       setError('Please provide an image URL for your project.');
       return;
@@ -49,8 +60,8 @@ export default function AddPortfolioItem() {
         .from('portfolio_items')
         .insert({
           freelancer_id: currentUser.id,
-          title: title.trim(),
-          description: description.trim(),
+          title: trimmedTitle,
+          description: trimmedDesc,
           image_url: imageUrl.trim(),
           link: link.trim() || null,
           category,
@@ -92,18 +103,24 @@ export default function AddPortfolioItem() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div>
-              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-                Project Title
-              </label>
+              <div className="flex justify-between items-end mb-2">
+                <label htmlFor="title" className="block text-sm font-semibold text-gray-700">
+                  Project Title
+                </label>
+                <span className={`text-[10px] font-medium ${title.length < 5 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {title.length} / 80 chars (min 5)
+                </span>
+              </div>
               <input
                 id="title"
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Brand Identity for TechCo"
+                onChange={(e) => setTitle(e.target.value.slice(0, 80))}
+                placeholder="e.g., Brand Identity Design for TechCo Startup"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 required
               />
+              <p className="text-[10px] text-gray-400 mt-1">Use a descriptive title. E.g., "Logo Design for XYZ Brand" not just "Logo".</p>
             </div>
 
             {/* Category */}
@@ -125,18 +142,24 @@ export default function AddPortfolioItem() {
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
-                Description
-              </label>
+              <div className="flex justify-between items-end mb-2">
+                <label htmlFor="description" className="block text-sm font-semibold text-gray-700">
+                  Description
+                </label>
+                <span className={`text-[10px] font-medium ${description.length < 30 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {description.length} / 1000 chars (min 30)
+                </span>
+              </div>
               <textarea
                 id="description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the project, your role, tools used, and results achieved..."
+                onChange={(e) => setDescription(e.target.value.slice(0, 1000))}
+                placeholder="Describe the project: your role, tools used, challenges solved, and results achieved..."
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
                 required
               />
+              <p className="text-[10px] text-gray-400 mt-1">Clients read this to decide if you're the right fit. Mention tools, process, and impact.</p>
             </div>
 
             {/* Image URL */}

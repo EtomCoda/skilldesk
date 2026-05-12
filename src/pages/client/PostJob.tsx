@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useStore } from '../store/useStore';
-import SkillInput from '../components/SkillInput';
+import { supabase } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
+import SkillInput from '../../components/SkillInput';
+import { notify } from '../../lib/notifications';
 
 export default function PostJob() {
   const navigate = useNavigate();
@@ -19,8 +20,20 @@ export default function PostJob() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    const trimmedTitle = title.trim();
+    const trimmedDesc  = description.trim();
+
+    if (trimmedTitle.length < 10) {
+      setError('Job title must be at least 10 characters.');
+      return;
+    }
+    if (trimmedDesc.length < 50) {
+      setError('Job description must be at least 50 characters. Be specific so freelancers can give accurate proposals.');
+      return;
+    }
+
+    setLoading(true);
     if (!currentUser) {
       setError('You must be logged in to post a job');
       setLoading(false);
@@ -31,26 +44,64 @@ export default function PostJob() {
       const min = parseFloat(minBudget);
       const max = parseFloat(maxBudget);
       
+      if (isNaN(min) || isNaN(max) || min <= 0 || max <= 0) {
+        setError('Please enter valid budget amounts (minimum ₦1000).');
+        setLoading(false);
+        return;
+      }
       if (min > max) {
         setError('Minimum budget cannot be greater than maximum budget.');
         setLoading(false);
         return;
       }
 
-      const { error: insertError } = await supabase
+      const { error: insertError, data: insertedJob } = await supabase
         .from('jobs')
         .insert({
           client_id: currentUser.id,
-          title,
-          description,
-          budget: max, // Keep for backward compat
+          title: trimmedTitle,
+          description: trimmedDesc,
+          budget: max,
           min_budget: min,
           max_budget: max,
           required_skills: requiredSkills.length ? requiredSkills.join(', ') : null,
           status: 'open',
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) throw insertError;
+
+      // Notify freelancers whose skills overlap with the job's required skills
+      if (requiredSkills.length > 0 && insertedJob) {
+        const { data: allFreelancers } = await supabase
+          .from('users')
+          .select('id, skills')
+          .neq('id', currentUser.id)
+          .not('skills', 'is', null);
+
+        if (allFreelancers) {
+          const jobSkillsLower = requiredSkills.map((s) => s.toLowerCase());
+          const matchedIds = allFreelancers
+            .filter((u) => {
+              const userSkills = (u.skills || '').toLowerCase().split(',').map((s: string) => s.trim());
+              return userSkills.some((s: string) => jobSkillsLower.some((js) => js.includes(s) || s.includes(js)));
+            })
+            .map((u) => u.id);
+
+          if (matchedIds.length > 0) {
+            await notify(
+              matchedIds.map((id) => ({
+                user_id: id,
+                type: 'new_job',
+                title: 'New job matching your skills',
+                body: `"${title}" — ₦${min.toLocaleString()} to ₦${max.toLocaleString()}. Apply now!`,
+                job_id: insertedJob.id,
+              }))
+            );
+          }
+        }
+      }
 
       navigate('/my-hires');
     } catch (err) {
@@ -74,18 +125,24 @@ export default function PostJob() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Job Title
-              </label>
+              <div className="flex justify-between items-end mb-2">
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                  Job Title
+                </label>
+                <span className={`text-[10px] font-medium ${title.length < 10 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {title.length} / 100 chars (min 10)
+                </span>
+              </div>
               <input
                 id="title"
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Need a Python Tutor"
+                onChange={(e) => setTitle(e.target.value.slice(0, 100))}
+                placeholder="e.g., Need a Python Tutor for Weekly Sessions"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                 required
               />
+              <p className="text-[10px] text-gray-400 mt-1">Use Title Case. Be specific — good titles attract better proposals.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -99,7 +156,7 @@ export default function PostJob() {
                   value={minBudget}
                   onChange={(e) => setMinBudget(e.target.value)}
                   placeholder="5000"
-                  min="0"
+                  min="1000"
                   step="100"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                   required
@@ -115,13 +172,14 @@ export default function PostJob() {
                   value={maxBudget}
                   onChange={(e) => setMaxBudget(e.target.value)}
                   placeholder="20000"
-                  min="0"
+                  min="1000"
                   step="100"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                   required
                 />
               </div>
             </div>
+            <p className="text-[10px] text-gray-400 -mt-3">Set a realistic range. Budgets must be at least ₦1000. Freelancers can negotiate within your range.</p>
 
             <SkillInput
               skills={requiredSkills}
@@ -131,18 +189,24 @@ export default function PostJob() {
             />
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Job Description
-              </label>
+              <div className="flex justify-between items-end mb-2">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  Job Description
+                </label>
+                <span className={`text-[10px] font-medium ${description.length < 50 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {description.length} / 2000 chars (min 50)
+                </span>
+              </div>
               <textarea
                 id="description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the job requirements, deliverables, and any other important details..."
+                onChange={(e) => setDescription(e.target.value.slice(0, 2000))}
+                placeholder="Describe the job: what you need done, key deliverables, timeline, and any tools or skills required..."
                 rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent text-sm"
                 required
               />
+              <p className="text-[10px] text-gray-400 mt-1">Be clear and specific. Include deadlines, deliverables, and any relevant context. Avoid sharing personal contact details.</p>
             </div>
 
             {error && (

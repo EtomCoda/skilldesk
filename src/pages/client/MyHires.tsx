@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, MessageSquare} from 'lucide-react';
-import { supabase, Job } from '../lib/supabase';
-import { useStore } from '../store/useStore';
+import { supabase, Job } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
 
 export default function MyHires() {
   const navigate = useNavigate();

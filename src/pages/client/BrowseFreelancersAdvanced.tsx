@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Star, Filter } from 'lucide-react';
-import { supabase, User as UserType } from '../lib/supabase';
-import { useStore } from '../store/useStore';
+import { supabase, User as UserType } from '../../lib/supabase';
+import { useStore } from '../../store/useStore';
 
 interface FreelancerWithStats extends UserType {
   stats?: {

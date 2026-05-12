@@ -1,28 +1,51 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
 import { useIdleTimeout } from './hooks/useIdleTimeout';
+import { ToastProvider, useToast } from './lib/toast';
+import { QK } from './lib/queryKeys';
+import {
+  fetchWallet, fetchConversationList, fetchOngoingJobs,
+  fetchProposals, fetchEarnings,
+} from './lib/queries';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import PostJob from './pages/PostJob';
-import FindWork from './pages/FindWork';
+import PostJob from './pages/client/PostJob';
+import FindWork from './pages/freelancer/FindWork';
 import JobDetails from './pages/JobDetails';
-import Chat from './pages/Chat';
 import Wallet from './pages/Wallet';
-import MyHires from './pages/MyHires';
-import MyProposals from './pages/MyProposals';
-import MyEarnings from './pages/MyEarnings';
-import BrowseFreelancersAdvanced from './pages/BrowseFreelancersAdvanced';
+import MyHires from './pages/client/MyHires';
+import OngoingJobs from './pages/client/OngoingJobs';
+import MyProposals from './pages/freelancer/MyProposals';
+import MyEarnings from './pages/freelancer/MyEarnings';
+import BrowseFreelancersAdvanced from './pages/client/BrowseFreelancersAdvanced';
 import SellerProfile from './pages/SellerProfile';
+import Support from './pages/Support';
 import ReviewJob from './pages/ReviewJob';
-import AddPortfolioItem from './pages/AddPortfolioItem';
-import ChatRequests from './pages/ChatRequests';
-import DirectChat from './pages/DirectChat';
-import MyMessages from './pages/MyMessages';
+import AddPortfolioItem from './pages/freelancer/AddPortfolioItem';
 import Messages from './pages/Messages';
 import ClientProfile from './pages/ClientProfile';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import ScrollToTop from './components/ScrollToTop';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminJobs from './pages/admin/AdminJobs';
+import AdminSupport from './pages/admin/AdminSupport';
+
+// Stable QueryClient singleton — shared across the whole app
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime:        5 * 60 * 1000, // data stays fresh for 5 minutes
+      gcTime:          10 * 60 * 1000, // keep unused cache for 10 minutes
+      retry:           1,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -53,18 +76,17 @@ function App() {
         
         const session = data?.session;
         if (session?.user) {
-          console.log("👤 Session found for user:", session.user.id);
-          // Don't await forever, if profile fetch is slow the app should still load
-          fetchProfile(session.user.id).catch(err => {
-            console.error("Error fetching profile:", err);
-          });
+          console.log(" Session found for user:", session.user.id);
+          // Await the profile so currentUser is set BEFORE loading becomes false.
+          // This prevents the login page flash on reload.
+          await fetchProfile(session.user.id);
         } else {
-          console.log("ℹ️ No active session found.");
+          console.log(" No active session found.");
         }
       } catch (error) {
-        console.error("❌ Error during initial session check:", error);
+        console.error(" Error during initial session check:", error);
       } finally {
-        console.log("✅ Initial check code reached finally block.");
+        console.log(" Initial check code reached finally block.");
         clearTimeout(checkTimeout);
         setLoading(false);
       }
@@ -95,23 +117,32 @@ function App() {
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    
+
     if (profile) {
       setCurrentUser(profile);
-      await fetchWallet(userId);
+
+      // Hydrate wallet into Zustand store (still needed for navbar balance display)
+      await fetchWallet(userId).then((w) => { if (w) setWallet(w); }).catch(() => {});
+
+      // Prefetch all data into React Query cache in parallel — pages read from
+      // cache instantly instead of showing a loading spinner.
+      const isFreelancer = false; // prefetch both modes to cover mode switching
+      queryClient.prefetchQuery({ queryKey: QK.wallet(userId),                     queryFn: () => fetchWallet(userId) });
+      queryClient.prefetchQuery({ queryKey: QK.conversations(userId, 'buying'),    queryFn: () => fetchConversationList(userId, false) });
+      queryClient.prefetchQuery({ queryKey: QK.conversations(userId, 'selling'),   queryFn: () => fetchConversationList(userId, true) });
+      queryClient.prefetchQuery({ queryKey: QK.ongoingJobs(userId),                queryFn: () => fetchOngoingJobs(userId) });
+      queryClient.prefetchQuery({ queryKey: QK.proposals(userId),                  queryFn: () => fetchProposals(userId) });
+      queryClient.prefetchQuery({ queryKey: QK.earnings(userId),                   queryFn: () => fetchEarnings(userId) });
     }
   };
 
-  const fetchWallet = async (userId: string) => {
+  const fetchWalletLegacy = async (userId: string) => {
     const { data } = await supabase
       .from('wallets')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    
-    if (data) {
-      setWallet(data);
-    }
+    if (data) setWallet(data);
   };
 
   const handleLogout = async () => {
@@ -137,46 +168,78 @@ function App() {
   }
 
   console.log("User active, rendering main app routers.");
-  return <AuthenticatedApp onLogout={handleLogout} />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <AuthenticatedApp onLogout={handleLogout} />
+      </ToastProvider>
+    </QueryClientProvider>
+  );
+}
+
+// ── /chat/:jobId → /messages?autoJobId=:jobId (legacy deep-link redirect) ──
+function ChatJobRedirect() {
+  const { jobId } = useParams<{ jobId: string }>();
+  return <Navigate to={`/messages?autoJobId=${jobId}`} replace />;
 }
 
 // ── Authenticated shell (idle timeout lives here) ──────────────────────────
 function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
+  const { toast } = useToast();
+  const { viewMode } = useStore();
   // Sign out automatically after 30 minutes of inactivity
   useIdleTimeout(30 * 60 * 1000, () => {
-    alert('You have been logged out due to inactivity.');
+    toast.warning('You have been logged out due to inactivity.', 'Session Expired');
   });
+
+  const isClient = viewMode === 'buying';
+  // #ECE8EF (light muted lavender-grey) for client backgrounds, deep navy for freelancer
+  const themeBg = isClient ? 'bg-[#ECE8EF]' : 'bg-[#0E0E52]';
 
   return (
     <BrowserRouter>
-      {/* Full viewport height flex column — navbar fixed at top, content scrolls below */}
-      <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
+      {/* 
+        NOTE: No overflow-auto on the wrapper — we let the document scroll naturally.
+        This is required for the sticky navbar to work correctly.
+      */}
+      <div className={`min-h-screen flex flex-col transition-colors duration-500 ${themeBg}`}>
+        <ScrollToTop />
         <Navbar onLogout={onLogout} />
-        <main className="flex-1 overflow-auto min-h-0">
+        <main className="flex-1 flex flex-col">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/post-job" element={<PostJob />} />
             <Route path="/find-work" element={<FindWork />} />
             <Route path="/job/:jobId" element={<JobDetails />} />
-            <Route path="/chat/:jobId" element={<Chat />} />
+            <Route path="/support" element={<Support />} />
             <Route path="/review/:jobId" element={<ReviewJob />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/my-hires" element={<MyHires />} />
+            <Route path="/ongoing-jobs" element={<OngoingJobs />} />
             <Route path="/my-proposals" element={<MyProposals />} />
             <Route path="/my-earnings" element={<MyEarnings />} />
             <Route path="/browse-freelancers" element={<BrowseFreelancersAdvanced />} />
             <Route path="/seller/:sellerId" element={<SellerProfile />} />
             <Route path="/portfolio/new" element={<AddPortfolioItem />} />
-            {/* Legacy routes — kept for deep links */}
-            <Route path="/chat-requests" element={<ChatRequests />} />
-            <Route path="/direct-chat/:conversationId" element={<DirectChat />} />
-            <Route path="/my-messages" element={<MyMessages />} />
-            {/* New unified routes */}
+            {/* Legacy chat routes — redirect to the unified Messages hub */}
+            <Route path="/chat/:jobId" element={<ChatJobRedirect />} />
+            <Route path="/chat-requests" element={<Navigate to="/messages" replace />} />
+            <Route path="/direct-chat/:conversationId" element={<Navigate to="/messages" replace />} />
+            <Route path="/my-messages" element={<Navigate to="/messages" replace />} />
+            {/* Unified routes */}
             <Route path="/messages" element={<Messages />} />
             <Route path="/client/:clientId" element={<ClientProfile />} />
+
+            {/* Admin routes */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/jobs" element={<AdminJobs />} />
+            <Route path="/admin/support" element={<AdminSupport />} />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
+        <Footer />
       </div>
     </BrowserRouter>
   );
