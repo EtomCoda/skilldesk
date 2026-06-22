@@ -337,7 +337,7 @@ export default function Navbar({ onLogout }: NavbarProps) {
             {isClient ? (
               /* ── CLIENT mode ── */
               <>
-                <Link to="/my-hires" className={navLink(isActive('/my-hires'), isClient)}>My Posted Jobs</Link>
+                <Link to="/" className={navLink(isActive('/') && location.pathname === '/', isClient)}>My Posted Jobs</Link>
                 <Link to="/ongoing-jobs" className={navLink(isActive('/ongoing-jobs'), isClient)}>Ongoing Jobs</Link>
                 <Link to="/browse-freelancers" className={navLink(isActive('/browse-freelancers'), isClient)}>Browse Freelancers</Link>
                 <Link
@@ -401,7 +401,7 @@ export default function Navbar({ onLogout }: NavbarProps) {
             <div className="py-2 space-y-1">
               {isClient ? (
                 <>
-                  <Link to="/my-hires" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                  <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg text-gray-700 hover:bg-gray-100">
                     <Briefcase className="w-4 h-4" />
                     My Posted Jobs
                   </Link>

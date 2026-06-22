@@ -103,7 +103,7 @@ export default function PostJob() {
         }
       }
 
-      navigate('/my-hires');
+      navigate('/');
     } catch (err) {
       setError('Failed to post job. Please try again.');
       console.error(err);

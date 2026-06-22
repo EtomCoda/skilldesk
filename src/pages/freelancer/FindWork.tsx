@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search,Clock } from 'lucide-react';
 import { supabase, Job, User } from '../../lib/supabase';
 import { useStore } from '../../store/useStore';
+import JobCardSkeleton from '../../components/JobCardSkeleton';
 interface JobWithClient extends Job {
   client: User;
 }
@@ -97,8 +98,21 @@ export default function FindWork() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <p className="text-gray-600">Loading jobs...</p>
+          <div className="mb-8">
+            <div className="mb-6">
+              <div className="h-8 bg-gray-200 rounded w-1/2 mb-3 animate-pulse"></div>
+              <div className="h-5 bg-gray-200 rounded w-2/3 animate-pulse"></div>
+            </div>
+            
+            <div className="relative animate-pulse">
+              <div className="w-full h-11 border border-gray-300 rounded-lg bg-gray-100"></div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <JobCardSkeleton key={i} />
+            ))}
           </div>
         </div>
       </div>

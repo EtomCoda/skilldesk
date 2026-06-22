@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Star, Filter } from 'lucide-react';
 import { supabase, User as UserType } from '../../lib/supabase';
 import { useStore } from '../../store/useStore';
+import FreelancerCardAdvancedSkeleton from '../../components/FreelancerCardAdvancedSkeleton';
 
 interface FreelancerWithStats extends UserType {
   stats?: {
@@ -117,7 +118,19 @@ export default function BrowseFreelancersAdvanced() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-gray-600">Loading freelancers...</p>
+          <div className="mb-8">
+            <div className="h-8 bg-gray-200 rounded w-1/2 mb-4 animate-pulse"></div>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 h-11 bg-gray-200 rounded-lg animate-pulse"></div>
+              <div className="h-11 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <FreelancerCardAdvancedSkeleton key={i} />
+            ))}
+          </div>
         </div>
       </div>
     );

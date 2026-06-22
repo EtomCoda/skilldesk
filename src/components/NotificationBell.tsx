@@ -6,7 +6,7 @@
  * 10 notifications as styled cards, each marked read on open.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, BellRing, CheckCircle, Briefcase, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -48,7 +48,7 @@ export default function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
 
   // Load notifications
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!currentUser) return;
     const { data } = await supabase
       .from('notifications')
@@ -57,14 +57,14 @@ export default function NotificationBell() {
       .order('created_at', { ascending: false })
       .limit(15);
     setItems((data as AppNotification[]) ?? []);
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     load();
     // Poll every 30 s
     const interval = setInterval(load, 30_000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [load]);
 
   // Mark all read when opening
   const handleOpen = async () => {

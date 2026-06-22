@@ -73,7 +73,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = {
     success: (msg: string, title?: string) => add('success', msg, title),
-    error:   (msg: string, title?: string) => add('error',   msg, title, 6000),
+    error:   (msg: string, title?: string) => {
+      let mappedMsg = String(msg || '');
+      let mappedTitle = title;
+      
+      const isNetworkError = 
+        !navigator.onLine || 
+        /failed to fetch/i.test(mappedMsg) || 
+        /load failed/i.test(mappedMsg) || 
+        /networkerror/i.test(mappedMsg) || 
+        /fetch failed/i.test(mappedMsg);
+        
+      if (isNetworkError) {
+        mappedMsg = 'Network connection lost. Please check your internet connection and try again.';
+        mappedTitle = title || 'Connection Error';
+      }
+      add('error', mappedMsg, mappedTitle, 6000);
+    },
     warning: (msg: string, title?: string) => add('warning', msg, title),
     info:    (msg: string, title?: string) => add('info',    msg, title),
   };

@@ -46,7 +46,7 @@ export default function Footer() {
             <div>
               <h3 className={`font-bold ${textTitle} mb-4 uppercase text-sm tracking-wider`}>For Clients</h3>
               <ul className="space-y-3">
-                <li><Link to="/my-hires" className={`${linkText} text-sm transition-colors`}>Post a Job</Link></li>
+                <li><Link to="/" className={`${linkText} text-sm transition-colors`}>My Posted Jobs</Link></li>
                 <li><Link to="/browse-freelancers" className={`${linkText} text-sm transition-colors`}>Browse Freelancers</Link></li>
                 <li><Link to="/support" className={`${linkText} text-sm transition-colors`}>Trust & Safety</Link></li>
               </ul>
@@ -73,13 +73,10 @@ export default function Footer() {
 
         </div>
         
-        <div className={`border-t ${borderClass} mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4`}>
-          <p className={`${textDesc} text-sm`}>
-            © {new Date().getFullYear()} SkillDesks. All rights reserved.
+        <div className={`border-t ${borderClass} mt-12 pt-8 flex flex-col items-center gap-4`}>
+          <p className={`${textDesc} text-sm text-center`}>
+            © {new Date().getFullYear()} Horizon by EtomCoda. All rights reserved.
           </p>
-          <div className="flex items-center gap-2">
-            <span className={`${textDesc} text-sm`}>Made with <span className="text-red-500">♥</span> for PAU Students</span>
-          </div>
         </div>
       </div>
     </footer>

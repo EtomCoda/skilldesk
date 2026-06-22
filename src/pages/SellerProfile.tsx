@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, MessageCircle, Plus, Edit3 } from 'lucide-react';
+import { Star, MessageCircle, Plus, Edit3, Trash2, X, ExternalLink } from 'lucide-react';
 import { supabase, User as UserType } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import SkillInput from '../components/SkillInput';
 import { useToast } from '../lib/toast';
+import PortfolioItemSkeleton from '../components/PortfolioItemSkeleton';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface Portfolio {
   id: string;
@@ -46,6 +48,14 @@ export default function SellerProfile() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editBio, setEditBio] = useState('');
   const [editSkills, setEditSkills] = useState<string[]>([]);
+  
+  // Portfolio Editing State
+  const [editingItem, setEditingItem] = useState<Portfolio | null>(null);
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
+  const [portfolioSaving, setPortfolioSaving] = useState(false);
+  const [portfolioDeleting, setPortfolioDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
   const setCurrentUser = useStore((state) => state.setCurrentUser);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -55,6 +65,16 @@ export default function SellerProfile() {
       fetchSellerProfile();
     }
   }, [sellerId]);
+
+  useEffect(() => {
+    // Automatically open edit modal if onboarding param is present and viewing own profile
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('onboarding') === 'true' && sellerId === currentUser?.id && !loading && seller) {
+      openEditModal();
+      // Remove query param from URL without refreshing to avoid re-opening on manual refresh
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [sellerId, currentUser, loading, seller]);
 
   const fetchSellerProfile = async () => {
     try {
@@ -95,6 +115,56 @@ export default function SellerProfile() {
       console.error('Error fetching seller profile:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdatePortfolio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setPortfolioSaving(true);
+    try {
+      const { error } = await supabase
+        .from('portfolio_items')
+        .update({
+          title: editingItem.title,
+          description: editingItem.description,
+          category: editingItem.category,
+          link: editingItem.link,
+          image_url: editingItem.image_url
+        })
+        .eq('id', editingItem.id);
+
+      if (error) throw error;
+
+      toast.success('Project updated successfully.');
+      setShowPortfolioModal(false);
+      setEditingItem(null);
+      fetchSellerProfile();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update project');
+    } finally {
+      setPortfolioSaving(false);
+    }
+  };
+
+  const handleDeletePortfolio = async (id: string) => {
+    setShowDeleteConfirm(null);
+    setPortfolioDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('portfolio_items')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Project deleted successfully.');
+      fetchSellerProfile();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete project');
+    } finally {
+      setPortfolioDeleting(false);
     }
   };
 
@@ -156,9 +226,9 @@ export default function SellerProfile() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .update({ 
-          bio: trimmedBio, 
-          skills: editSkills.join(', ') 
+        .update({
+          bio: trimmedBio,
+          skills: editSkills.join(', ')
         })
         .eq('id', currentUser.id)
         .select()
@@ -182,7 +252,25 @@ export default function SellerProfile() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-gray-600">Loading seller profile...</p>
+          <div className="bg-white rounded-xl shadow-sm p-8 mb-6 animate-pulse">
+            <div className="flex flex-col md:flex-row gap-6 mb-8">
+              <div className="w-24 h-24 bg-gray-200 rounded-full flex-shrink-0"></div>
+              <div className="flex-1">
+                <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="space-y-3">
+                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <PortfolioItemSkeleton key={i} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -316,28 +404,53 @@ export default function SellerProfile() {
               ) : (
                 <div className="grid md:grid-cols-2 gap-6">
                   {portfolio.map((item) => (
-                    <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                      <img
-                        src={item.image_url}
-                        alt={item.title}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="p-4">
-                        <p className="text-xs font-semibold uppercase" style={{ color: 'rgb(37, 99, 235)' }}>
+                    <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                      <div className="relative group">
+                        <img
+                          src={item.image_url}
+                          alt={item.title}
+                          className="w-full h-48 object-cover"
+                        />
+                        {isOwnProfile && (
+                          <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditingItem(item);
+                                setShowPortfolioModal(true);
+                              }}
+                              className="p-2 bg-white rounded-full shadow-lg text-gray-600 hover:text-blue-600 transition-colors"
+                              title="Edit Project"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setShowDeleteConfirm(item.id)}
+                              disabled={portfolioDeleting}
+                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4 flex-1 flex flex-col">
+                        <p className="text-xs font-semibold uppercase mb-1" style={{ color: 'rgb(37, 99, 235)' }}>
                           {item.category}
                         </p>
                         <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+                        <p className="text-sm text-gray-600 mb-4 line-clamp-3 overflow-hidden flex-1">{item.description}</p>
                         <div className="flex gap-2">
                           {item.link && (
                             <a
                               href={item.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex-1 px-3 py-2 rounded-lg text-sm font-medium text-white text-center transition-all hover:shadow-md"
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white text-center transition-all hover:shadow-md"
                               style={{ backgroundColor: 'rgb(37, 99, 235)' }}
                             >
-                              View
+                              <ExternalLink className="w-4 h-4" />
+                              View Project
                             </a>
                           )}
                         </div>
@@ -386,6 +499,105 @@ export default function SellerProfile() {
           </div>
         </div>
       </div>
+
+      {/* Portfolio Item Edit Modal */}
+      {showPortfolioModal && editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h2 className="text-2xl font-bold text-gray-900">Edit Project</h2>
+              <button onClick={() => { setShowPortfolioModal(false); setEditingItem(null); }} className="p-2 hover:bg-gray-100 rounded-full">
+                <X className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdatePortfolio} className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Project Title</label>
+                <input
+                  type="text"
+                  value={editingItem.title}
+                  onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select
+                    value={editingItem.category}
+                    onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    required
+                  >
+                    <option value="Web Development">Web Development</option>
+                    <option value="Mobile Apps">Mobile Apps</option>
+                    <option value="UI/UX Design">UI/UX Design</option>
+                    <option value="Graphic Design">Graphic Design</option>
+                    <option value="Content Writing">Content Writing</option>
+                    <option value="Digital Marketing">Digital Marketing</option>
+                    <option value="Data Science">Data Science</option>
+                    <option value="E-commerce">E-commerce</option>
+                    <option value="AI & ML">AI & ML</option>
+                    <option value="Blockchain">Blockchain</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Project Link (Optional)</label>
+                  <input
+                    type="url"
+                    value={editingItem.link || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, link: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Thumbnail URL</label>
+                <input
+                  type="url"
+                  value={editingItem.image_url}
+                  onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  value={editingItem.description}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4 sticky bottom-0 bg-white">
+                <button
+                  type="button"
+                  onClick={() => { setShowPortfolioModal(false); setEditingItem(null); }}
+                  className="flex-1 px-6 py-3 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={portfolioSaving}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+                >
+                  {portfolioSaving ? 'Saving...' : 'Update Project'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showChatModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -509,6 +721,17 @@ export default function SellerProfile() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!showDeleteConfirm}
+        title="Delete Project"
+        message="Are you sure you want to delete this project?"
+        confirmText="Yes, Delete"
+        isDestructive
+        onConfirm={() => showDeleteConfirm && handleDeletePortfolio(showDeleteConfirm)}
+        onCancel={() => setShowDeleteConfirm(null)}
+      />
     </div>
   );
+
 }

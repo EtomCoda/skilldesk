@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Search, XCircle, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Briefcase, Search, XCircle, ArrowLeft, ExternalLink, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../store/useStore';
 import { QK } from '../../lib/queryKeys';
 import { fetchAdminJobs } from '../../lib/queries';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 export default function AdminJobs() {
   const navigate     = useNavigate();
@@ -14,6 +15,11 @@ export default function AdminJobs() {
   const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [cancelling,   setCancelling]   = useState<string | null>(null);
+  const [deleting,     setDeleting]     = useState<string | null>(null);
+
+  // Modal states
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: QK.adminJobs(),
@@ -32,11 +38,25 @@ export default function AdminJobs() {
   });
 
   const handleCancel = async (jobId: string) => {
-    if (!confirm('Cancel this job? This cannot be undone.')) return;
+    setConfirmCancel(null);
     setCancelling(jobId);
     await supabase.from('jobs').update({ status: 'cancelled' }).eq('id', jobId);
     qc.invalidateQueries({ queryKey: QK.adminJobs() });
     setCancelling(null);
+  };
+
+  const handleDelete = async (jobId: string) => {
+    setConfirmDelete(null);
+    setDeleting(jobId);
+    try {
+      const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: QK.adminJobs() });
+    } catch (error: any) {
+      console.error('Error deleting job:', error);
+      alert(error.message || 'Failed to delete job. Please try again.');
+    }
+    setDeleting(null);
   };
 
   const statusColors: Record<string, string> = {
@@ -103,19 +123,51 @@ export default function AdminJobs() {
                     <ExternalLink className="w-3.5 h-3.5" /> View
                   </Link>
                   {job.status === 'open' && (
-                    <button onClick={() => handleCancel(job.id)} disabled={cancelling === job.id}
+                    <button onClick={() => setConfirmCancel(job.id)} disabled={cancelling === job.id}
                       className="flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium transition-colors disabled:opacity-50">
                       <XCircle className="w-3.5 h-3.5" />
                       {cancelling === job.id ? 'Cancelling...' : 'Cancel'}
                     </button>
                   )}
+                  <button 
+                    onClick={() => setConfirmDelete(job.id)} 
+                    disabled={deleting === job.id}
+                    className="flex items-center gap-1 text-red-600 hover:text-red-800 text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {deleting === job.id ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && <div className="text-center py-16 text-gray-400">No jobs found</div>}
+            {filtered.length === 0 && (
+              <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
+                No jobs found.
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!confirmCancel}
+        title="Cancel Job"
+        message="Cancel this job? This cannot be undone."
+        confirmText="Yes, Cancel"
+        isDestructive
+        onConfirm={() => confirmCancel && handleCancel(confirmCancel)}
+        onCancel={() => setConfirmCancel(null)}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmDelete}
+        title="Delete Job"
+        message="Delete this job completely? This action cannot be undone and will remove all associated data."
+        confirmText="Yes, Delete"
+        isDestructive
+        onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

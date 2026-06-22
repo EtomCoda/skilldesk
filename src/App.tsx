@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStore } from './store/useStore';
@@ -10,13 +10,13 @@ import {
   fetchWallet, fetchConversationList, fetchOngoingJobs,
   fetchProposals, fetchEarnings,
 } from './lib/queries';
+import { ProtectedClientRoute, ProtectedFreelancerRoute } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PostJob from './pages/client/PostJob';
 import FindWork from './pages/freelancer/FindWork';
 import JobDetails from './pages/JobDetails';
 import Wallet from './pages/Wallet';
-import MyHires from './pages/client/MyHires';
 import OngoingJobs from './pages/client/OngoingJobs';
 import MyProposals from './pages/freelancer/MyProposals';
 import MyEarnings from './pages/freelancer/MyEarnings';
@@ -47,26 +47,33 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Wipes every piece of client-side state from a previous session. */
+function fullSessionTeardown() {
+  // 1. Clear React Query cache so no previous user's data bleeds into the next session
+  queryClient.clear();
+  // 2. Clear any leftover localStorage / sessionStorage keys
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch (_) { /* ignore in private-browsing environments */ }
+}
+
 function App() {
   const [loading, setLoading] = useState(true);
-  const { currentUser, setCurrentUser, setWallet } = useStore();
+  const { currentUser, setCurrentUser, setWallet, setViewMode, clearAll } = useStore();
 
   useEffect(() => {
     let checkTimeout: NodeJS.Timeout;
 
     // 1. Initial session check with safety timeout
     const checkUser = async () => {
-      console.log("🏁 Starting initial session check...");
-      
       // Safety timeout: stop spinning after 5 seconds no matter what
       checkTimeout = setTimeout(() => {
-        console.warn("⚠️ Initial check exceeded 5s. Forcing spinner to close.");
         setLoading(false);
       }, 5000);
 
       try {
         if (!supabase) {
-          console.error("❌ Supabase client is not initialized!");
           setLoading(false);
           return;
         }
@@ -76,17 +83,19 @@ function App() {
         
         const session = data?.session;
         if (session?.user) {
-          console.log(" Session found for user:", session.user.id);
+          // Set initial view mode from metadata if present
+          const userRole = session.user.user_metadata?.role;
+          if (userRole === 'buying' || userRole === 'selling') {
+            setViewMode(userRole);
+          }
+
           // Await the profile so currentUser is set BEFORE loading becomes false.
           // This prevents the login page flash on reload.
           await fetchProfile(session.user.id);
-        } else {
-          console.log(" No active session found.");
         }
       } catch (error) {
-        console.error(" Error during initial session check:", error);
+        console.error('Error during initial session check:', error);
       } finally {
-        console.log(" Initial check code reached finally block.");
         clearTimeout(checkTimeout);
         setLoading(false);
       }
@@ -95,13 +104,25 @@ function App() {
     checkUser();
 
     // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("🔄 Auth state changed:", _event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // PASSWORD_RECOVERY: stay on login screen, let the Login component handle it
+      if (event === 'PASSWORD_RECOVERY') {
+        clearAll();
+        return;
+      }
+
       if (session?.user) {
+        // Set view mode from user metadata on every auth event
+        const userRole = session.user.user_metadata?.role;
+        if (userRole === 'buying' || userRole === 'selling') {
+          setViewMode(userRole);
+        }
+        
         fetchProfile(session.user.id).catch(err => console.error(err));
       } else {
-        setCurrentUser(null);
-        setWallet(null);
+        // Signed out — wipe everything
+        clearAll();
+        fullSessionTeardown();
       }
     });
 
@@ -109,6 +130,7 @@ function App() {
       subscription.unsubscribe();
       if (checkTimeout) clearTimeout(checkTimeout);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfile = async (userId: string) => {
@@ -126,7 +148,6 @@ function App() {
 
       // Prefetch all data into React Query cache in parallel — pages read from
       // cache instantly instead of showing a loading spinner.
-      const isFreelancer = false; // prefetch both modes to cover mode switching
       queryClient.prefetchQuery({ queryKey: QK.wallet(userId),                     queryFn: () => fetchWallet(userId) });
       queryClient.prefetchQuery({ queryKey: QK.conversations(userId, 'buying'),    queryFn: () => fetchConversationList(userId, false) });
       queryClient.prefetchQuery({ queryKey: QK.conversations(userId, 'selling'),   queryFn: () => fetchConversationList(userId, true) });
@@ -136,25 +157,17 @@ function App() {
     }
   };
 
-  const fetchWalletLegacy = async (userId: string) => {
-    const { data } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (data) setWallet(data);
-  };
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
+    // 1. Sign out from Supabase
     await supabase.auth.signOut();
-    setCurrentUser(null);
-    setWallet(null);
-  };
-
-  console.log("App render:", { loading, hasUser: !!currentUser });
+    // 2. Wipe Zustand store
+    clearAll();
+    // 3. Wipe React Query cache + browser storage
+    fullSessionTeardown();
+    // App will re-render to the login screen because currentUser is now null
+  }, [clearAll]);
 
   if (loading) {
-    console.log("Rendering spinner...");
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -163,11 +176,9 @@ function App() {
   }
 
   if (!currentUser) {
-    console.log("No user found after loading, rendering Login screen.");
     return <Login onLogin={() => {}} />;
   }
 
-  console.log("User active, rendering main app routers.");
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -183,10 +194,18 @@ function ChatJobRedirect() {
   return <Navigate to={`/messages?autoJobId=${jobId}`} replace />;
 }
 
+// ── Admin route guard ───────────────────────────────────────────────────────
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useStore();
+  if (!currentUser?.is_admin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 // ── Authenticated shell (idle timeout lives here) ──────────────────────────
 function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
   const { toast } = useToast();
   const { viewMode } = useStore();
+
   // Sign out automatically after 30 minutes of inactivity
   useIdleTimeout(30 * 60 * 1000, () => {
     toast.warning('You have been logged out due to inactivity.', 'Session Expired');
@@ -208,19 +227,19 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
         <main className="flex-1 flex flex-col">
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/post-job" element={<PostJob />} />
-            <Route path="/find-work" element={<FindWork />} />
+            <Route path="/post-job" element={<ProtectedClientRoute><PostJob /></ProtectedClientRoute>} />
+            <Route path="/find-work" element={<ProtectedFreelancerRoute><FindWork /></ProtectedFreelancerRoute>} />
             <Route path="/job/:jobId" element={<JobDetails />} />
             <Route path="/support" element={<Support />} />
             <Route path="/review/:jobId" element={<ReviewJob />} />
             <Route path="/wallet" element={<Wallet />} />
-            <Route path="/my-hires" element={<MyHires />} />
-            <Route path="/ongoing-jobs" element={<OngoingJobs />} />
-            <Route path="/my-proposals" element={<MyProposals />} />
-            <Route path="/my-earnings" element={<MyEarnings />} />
-            <Route path="/browse-freelancers" element={<BrowseFreelancersAdvanced />} />
+            <Route path="/my-hires" element={<Navigate to="/" replace />} />
+            <Route path="/ongoing-jobs" element={<ProtectedClientRoute><OngoingJobs /></ProtectedClientRoute>} />
+            <Route path="/my-proposals" element={<ProtectedFreelancerRoute><MyProposals /></ProtectedFreelancerRoute>} />
+            <Route path="/my-earnings" element={<ProtectedFreelancerRoute><MyEarnings /></ProtectedFreelancerRoute>} />
+            <Route path="/browse-freelancers" element={<ProtectedClientRoute><BrowseFreelancersAdvanced /></ProtectedClientRoute>} />
             <Route path="/seller/:sellerId" element={<SellerProfile />} />
-            <Route path="/portfolio/new" element={<AddPortfolioItem />} />
+            <Route path="/portfolio/new" element={<ProtectedFreelancerRoute><AddPortfolioItem /></ProtectedFreelancerRoute>} />
             {/* Legacy chat routes — redirect to the unified Messages hub */}
             <Route path="/chat/:jobId" element={<ChatJobRedirect />} />
             <Route path="/chat-requests" element={<Navigate to="/messages" replace />} />
@@ -230,11 +249,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
             <Route path="/messages" element={<Messages />} />
             <Route path="/client/:clientId" element={<ClientProfile />} />
 
-            {/* Admin routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/jobs" element={<AdminJobs />} />
-            <Route path="/admin/support" element={<AdminSupport />} />
+            {/* Admin routes — guarded: non-admins are redirected to / */}
+            <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
+            <Route path="/admin/users" element={<AdminGuard><AdminUsers /></AdminGuard>} />
+            <Route path="/admin/jobs" element={<AdminGuard><AdminJobs /></AdminGuard>} />
+            <Route path="/admin/support" element={<AdminGuard><AdminSupport /></AdminGuard>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -246,4 +265,3 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
 }
 
 export default App;
-
