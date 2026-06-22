@@ -5,6 +5,7 @@ export const QK = {
   wallet:       (userId: string) => ['wallet', userId]      as const,
   conversations:(userId: string, mode: string) => ['conversations', userId, mode] as const,
   ongoingJobs:  (userId: string) => ['ongoingJobs', userId] as const,
+  clientJobs:   (userId: string) => ['clientJobs', userId]  as const,
   proposals:    (userId: string) => ['proposals', userId]   as const,
   earnings:     (userId: string) => ['earnings', userId]    as const,
   adminStats:   ()               => ['adminStats']          as const,

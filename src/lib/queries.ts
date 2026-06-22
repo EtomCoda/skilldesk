@@ -40,12 +40,45 @@ export async function fetchConversationList(userId: string, isFreelancer: boolea
 export async function fetchOngoingJobs(userId: string) {
   const { data, error } = await supabase
     .from('jobs')
-    .select('*')
+    .select(`
+      *,
+      proposals (count),
+      hires (
+        freelancer:users (full_name)
+      )
+    `)
     .eq('client_id', userId)
     .in('status', ['in_progress', 'completed', 'cancelled'])
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  
+  return (data ?? []).map(job => ({
+    ...job,
+    proposalCount: job.proposals?.[0]?.count || 0,
+    hiredFreelancer: job.hires?.[0]?.freelancer?.full_name || null
+  }));
+}
+
+// ─── All Jobs (client) ───────────────────────────────────────────────────────
+export async function fetchAllClientJobs(userId: string) {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(`
+      *,
+      proposals (count),
+      hires (
+        freelancer:users (full_name)
+      )
+    `)
+    .eq('client_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  
+  return (data ?? []).map(job => ({
+    ...job,
+    proposalCount: job.proposals?.[0]?.count || 0,
+    hiredFreelancer: job.hires?.[0]?.freelancer?.full_name || null
+  }));
 }
 
 // ─── Proposals (freelancer) ──────────────────────────────────────────────────
