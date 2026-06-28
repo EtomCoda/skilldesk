@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { TrendingUp, Briefcase, CheckCircle, Clock, ArrowDownToLine, ArrowRightLeft, Banknote } from 'lucide-react';
@@ -7,18 +6,24 @@ import { useStore } from '../../store/useStore';
 import { useToast } from '../../lib/toast';
 import { QK } from '../../lib/queryKeys';
 import { fetchEarnings } from '../../lib/queries';
-
-interface EarningsTransaction {
-  id: string; amount: number; description: string; created_at: string; job_id?: string;
-}
+import BankDetails from '../../components/BankDetails';
+import { PromptModal } from '../../components/PromptModal';
 
 export default function MyEarnings() {
-  const navigate = useNavigate();
   const { currentUser, setWallet } = useStore();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [withdrawing,  setWithdrawing]  = useState(false);
   const [transferring, setTransferring] = useState(false);
+
+  // Prompt state
+  const [promptState, setPromptState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  } | null>(null);
 
   // ── React Query: earnings + wallet in one cached call ───────────────────
   const { data, isLoading } = useQuery({
@@ -30,7 +35,7 @@ export default function MyEarnings() {
   // Keep Zustand store in sync whenever React Query refetches
   useEffect(() => {
     if (data?.wallet) setWallet(data.wallet);
-  }, [data?.wallet]);
+  }, [data?.wallet, setWallet]);
 
   const hires        = data?.hires        ?? [];
   const earningsTxns = data?.transactions ?? [];
@@ -42,72 +47,76 @@ export default function MyEarnings() {
     qc.invalidateQueries({ queryKey: QK.wallet(currentUser!.id) });
   };
 
-  // ─── Withdraw Earnings ──────────────────────────────────────────────────
+  // ─── Withdraw Earnings ──────────────────────────────────────────────
   const handleWithdraw = async () => {
-    // Re-fetch live balance before acting (safety net even though RQ is fresh)
-    const { data: live } = await supabase.from('wallets').select('*').eq('user_id', currentUser?.id).single();
+    const { data: live } = await supabase.from('wallets').select('freelancer_balance').eq('user_id', currentUser?.id).single();
     const freeBal = live?.freelancer_balance ?? 0;
     if (freeBal <= 0) { toast.warning('You have no earnings available for withdrawal. Complete a job to earn funds.'); return; }
 
-    const amount = prompt(`Enter amount to withdraw (₦):\n\nAvailable balance: ₦${freeBal.toLocaleString()}`, freeBal.toString());
-    if (!amount) return;
-    const withdrawAmount = parseFloat(amount);
-    if (isNaN(withdrawAmount) || withdrawAmount <= 0) { toast.warning('Please enter a valid amount.'); return; }
-    if (withdrawAmount > freeBal) { toast.error(`Insufficient balance. You only have ₦${freeBal.toLocaleString()} available.`); return; }
+    setPromptState({
+      isOpen: true,
+      title: 'Withdraw Earnings',
+      message: `Enter amount to withdraw (₦):\n\nAvailable balance: ₦${freeBal.toLocaleString()}`,
+      defaultValue: freeBal.toString(),
+      onConfirm: async (amountStr) => {
+        setPromptState(null);
+        const withdrawAmount = parseFloat(amountStr);
+        if (isNaN(withdrawAmount) || withdrawAmount <= 0) { toast.warning('Please enter a valid amount.'); return; }
+        if (withdrawAmount > freeBal) { toast.error(`Insufficient balance. You only have ₦${freeBal.toLocaleString()} available.`); return; }
 
-    setWithdrawing(true);
-    try {
-      const { error } = await supabase.from('wallets').update({
-        freelancer_balance: freeBal - withdrawAmount,
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', currentUser?.id);
-      if (error) throw error;
-      await supabase.from('transactions').insert({
-        user_id: currentUser?.id, amount: withdrawAmount, type: 'withdrawal',
-        description: 'Withdrawal to bank account',
-      });
-      invalidate();
-      toast.success(`₦${withdrawAmount.toLocaleString()} withdrawal is being processed.`, 'Withdrawal Successful!');
-    } catch (err) {
-      console.error(err);
-      toast.error('Withdrawal failed. Please try again.');
-    } finally {
-      setWithdrawing(false);
-    }
+        setWithdrawing(true);
+        try {
+          // Call Edge Function to initiate Paystack Transfer (deducts from wallet and sends to bank)
+          const { error } = await supabase.functions.invoke('paystack-transfer', {
+            body: { amount: withdrawAmount }
+          });
+          if (error) throw error;
+          invalidate();
+          toast.success(`₦${withdrawAmount.toLocaleString()} withdrawal is being processed.`, 'Withdrawal Successful!');
+        } catch (err: unknown) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : 'Withdrawal failed. Please ensure bank details are saved.');
+        } finally {
+          setWithdrawing(false);
+        }
+      }
+    });
   };
 
-  // ─── Transfer Earnings → Client Wallet ─────────────────────────────────
+  // ─── Transfer Earnings → Client Wallet ─────────────────────────────────────
   const handleTransferToClient = async () => {
-    const { data: live } = await supabase.from('wallets').select('*').eq('user_id', currentUser?.id).single();
+    const { data: live } = await supabase.from('wallets').select('freelancer_balance').eq('user_id', currentUser?.id).single();
     const freeBal = live?.freelancer_balance ?? 0;
     if (freeBal <= 0) { toast.warning('You have no earnings available to transfer. Complete a job to earn funds.'); return; }
 
-    const amount = prompt(`Enter amount to transfer to Client Wallet (₦):\n\nAvailable balance: ₦${freeBal.toLocaleString()}`, freeBal.toString());
-    if (!amount) return;
-    const transferAmount = parseFloat(amount);
-    if (isNaN(transferAmount) || transferAmount <= 0) { toast.warning('Please enter a valid amount.'); return; }
-    if (transferAmount > freeBal) { toast.error(`Insufficient balance. You only have ₦${freeBal.toLocaleString()} available.`); return; }
+    setPromptState({
+      isOpen: true,
+      title: 'Transfer to Client Wallet',
+      message: `Enter amount to transfer to Client Wallet (₦):\n\nAvailable balance: ₦${freeBal.toLocaleString()}`,
+      defaultValue: freeBal.toString(),
+      onConfirm: async (amountStr) => {
+        setPromptState(null);
+        const transferAmount = parseFloat(amountStr);
+        if (isNaN(transferAmount) || transferAmount <= 0) { toast.warning('Please enter a valid amount.'); return; }
+        if (transferAmount > freeBal) { toast.error(`Insufficient balance. You only have ₦${freeBal.toLocaleString()} available.`); return; }
 
-    setTransferring(true);
-    try {
-      const { error } = await supabase.from('wallets').update({
-        freelancer_balance: freeBal - transferAmount,
-        available_balance:  (live?.available_balance ?? 0) + transferAmount,
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', currentUser?.id);
-      if (error) throw error;
-      await supabase.from('transactions').insert({
-        user_id: currentUser?.id, amount: transferAmount, type: 'transfer_to_client',
-        description: 'Transfer from Freelancer earnings to Client wallet',
-      });
-      invalidate();
-      toast.success(`₦${transferAmount.toLocaleString()} transferred successfully.`, 'Transfer Complete!');
-    } catch (err) {
-      console.error(err);
-      toast.error('Transfer failed. Please try again.');
-    } finally {
-      setTransferring(false);
-    }
+        setTransferring(true);
+        try {
+          // Use secure Postgres RPC — handles both balance deduction and credit atomically
+          const { error } = await supabase.rpc('rpc_transfer_to_client', {
+            p_amount: transferAmount
+          });
+          if (error) throw error;
+          invalidate();
+          toast.success(`₦${transferAmount.toLocaleString()} transferred successfully.`, 'Transfer Complete!');
+        } catch (err: unknown) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : 'Transfer failed. Please try again.');
+        } finally {
+          setTransferring(false);
+        }
+      }
+    });
   };
 
   if (isLoading) {
@@ -143,6 +152,10 @@ export default function MyEarnings() {
               {withdrawing ? 'Processing...' : 'Withdraw Earnings'}
             </button>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <BankDetails />
         </div>
 
         {/* ── Stats grid ── */}
@@ -233,6 +246,16 @@ export default function MyEarnings() {
           )}
         </div>
       </div>
+      {promptState && (
+        <PromptModal
+          isOpen={promptState.isOpen}
+          title={promptState.title}
+          message={promptState.message}
+          defaultValue={promptState.defaultValue}
+          onConfirm={promptState.onConfirm}
+          onCancel={() => setPromptState(null)}
+        />
+      )}
     </div>
   );
 }

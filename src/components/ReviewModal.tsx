@@ -35,7 +35,7 @@ export default function ReviewModal({
         job_id: jobId,
         reviewer_id: currentUserId,
         reviewer_is_client: isClient,
-        recipient_id: recipientId,
+        reviewee_id: recipientId,
         rating,
         comment: comment.trim() || null,
       });

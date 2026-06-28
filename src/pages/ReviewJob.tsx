@@ -92,6 +92,7 @@ export default function ReviewJob() {
           job_id: job.id,
           reviewer_id: currentUser.id,
           reviewee_id: otherUser.id,
+          reviewer_is_client: isClient,
           rating,
           comment: trimmedComment,
         });

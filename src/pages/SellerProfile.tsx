@@ -98,6 +98,7 @@ export default function SellerProfile() {
         .from('reviews')
         .select('*, reviewer:reviewer_id(id, full_name, avatar_url)')
         .eq('reviewee_id', sellerId)
+        .eq('reviewer_is_client', true)
         .order('created_at', { ascending: false });
 
       setReviews(reviewsData || []);

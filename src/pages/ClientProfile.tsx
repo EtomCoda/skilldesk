@@ -56,11 +56,12 @@ export default function ClientProfile() {
 
       setStats({ jobsPosted: postedCount, jobsCompleted: completedCount });
 
-      // Reviews received as a client (reviewee_id = clientId)
+      // Reviews received as a client — only from freelancers rating them as an employer
       const { data: reviewData } = await supabase
         .from('reviews')
         .select('id, rating, comment, created_at, reviewer:reviewer_id(id, full_name), job:job_id(id, title)')
         .eq('reviewee_id', clientId)
+        .eq('reviewer_is_client', false)
         .order('created_at', { ascending: false });
 
       setReviews((reviewData as unknown as ClientReview[]) || []);
