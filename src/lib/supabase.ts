@@ -13,6 +13,7 @@ export interface User {
   bio?: string;
   skills?: string;
   is_admin?: boolean;
+  default_view?: 'buying' | 'selling';
   created_at: string;
 }
 

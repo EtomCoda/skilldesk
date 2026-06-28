@@ -63,6 +63,7 @@ export default function Login({ onLogin }: LoginProps) {
               id: authData.user.id,
               email,
               full_name: fullName,
+              default_view: signupRole,
             })
             .select()
             .maybeSingle();
@@ -123,6 +124,7 @@ export default function Login({ onLogin }: LoginProps) {
           }
 
           setCurrentUser(profile);
+          setViewMode(profile.default_view ?? 'buying');
           onLogin();
         }
       }
